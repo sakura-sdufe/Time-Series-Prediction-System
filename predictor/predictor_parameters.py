@@ -12,7 +12,7 @@
 
 class PredictorParameters:
     def __init__(self):
-        self.save_dir = './result/同频多变量预测结果（无特征选择）'  # 模型保存路径
+        self.save_dir = './result/同频多变量预测结果（特征选择）'  # 模型保存路径
         # Persistence 模型参数
         self.Persistence = {}
         # SVR 模型参数

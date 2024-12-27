@@ -19,7 +19,7 @@ from data import DataSplit
 from metrics import calculate_metrics
 from display import cprint, Drawer, Writer
 
-from parameters import PredictorParameters
+from .predictor_parameters import PredictorParameters
 
 
 class Predictors:

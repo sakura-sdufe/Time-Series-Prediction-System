@@ -15,7 +15,7 @@ from matplotlib import rcParams
 from sklearn.feature_selection import SelectKBest, mutual_info_regression
 
 from preprocessing import read_validation_file
-from data import Norm, DataSplit
+from data import Norm, DataSplit, SeqLoader
 from predictor import SVR, Ridge, RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor, BaggingRegressor
 from predictor import Predictors
 
@@ -46,10 +46,24 @@ if __name__ == '__main__':
     "feature_selected 是经过特征选择后的特征；feature 是原始特征"
 
     # 数据集标准化、数据集封装、数据集划分
-    data_split = DataSplit(feature, target, parameters_data, normalization=Norm)
+    data_split = DataSplit(feature_selected, target, parameters_data, normalization=Norm)
+    seq_loader = SeqLoader(feature_selected, target, parameters_data, normalization=Norm)
+    """
+    train_feature, train_target = data_split.get_dataset(dataname='train', to_numpy=True)
+    valid_feature, valid_target = data_split.get_dataset(dataname='valid', to_numpy=True)
+    test_feature, test_target = data_split.get_dataset(dataname='test', to_numpy=True)
+    train_loader, valid_loader, test_loader = seq_loader.get_all_loader()
+    """
 
     # 选择预测器
     models_cls = [SVR, Ridge, RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor, BaggingRegressor]
     is_normalization = [True, True, False, False, False, False]  # 是否需要标准化
     predictors = Predictors(data_split, save_relpath=parameters_predictor['save_dir'], y_label='风电值')
     models_trained = predictors.all_models(models_cls, parameters_predictor, is_normalization=is_normalization)
+
+
+
+
+
+
+
