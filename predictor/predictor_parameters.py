@@ -86,3 +86,9 @@ class PredictorParameters:
 
     def __getitem__(self, item):
         return getattr(self, item)
+
+    def __iter__(self):
+        return iter(self.__dict__.items())
+
+    def items(self):
+        return self.__dict__.items()
