@@ -13,10 +13,8 @@
 from .data_scale.norm import Norm
 from .data_scale.min_max import MinMax
 
-from .data_encapsulation.dataset_split import split_dataset
-from .data_encapsulation.convert_feature import convert_feature
-
-from .data_main import DataSplit
+from .data_encapsulation.data_convert import DataSplit
+from .data_encapsulation.data_loader import Seqset, SeqLoader
 
 
-__all__ = ['MinMax', 'Norm', 'split_dataset', 'convert_feature', 'DataSplit']
+__all__ = ['Norm', 'MinMax', 'DataSplit', 'Seqset', 'SeqLoader']

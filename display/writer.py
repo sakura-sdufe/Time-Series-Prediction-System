@@ -13,13 +13,17 @@
 import os
 import pickle
 import pandas as pd
+import warnings
+
+from datetime import datetime
 
 
 class Writer:
-    def __init__(self, save_dir):
+    def __init__(self, save_dir, is_delete=False):
         """
         写入指标、参数、数据、日志；保存模型
         :param save_dir: 保存的根目录
+        :param is_delete: 是否删除原有的 save_dir 文件夹
         """
         # 指标、参数、数据的索引
         self.metric_key_index, self.parameter_key_index, self.data_key_index = 0, 0, 0
@@ -28,9 +32,13 @@ class Writer:
         self.data = dict()  # 数据（key 为关键词，value:pd.DataFrame 为所存储的数据）
         self.log = dict()  # 日志（key 为关键词，value:str 为所存储的日志）
 
+        self. save_dir = save_dir  # 保存的根目录
         self.save_documents_path = os.path.join(save_dir, 'documents')  # 保存的文档路径
         self.save_models_path = os.path.join(save_dir, 'models_trained')  # 保存的模型路径
         self.save_results_path = os.path.join(save_dir, 'results')  # 保存的结果路径
+
+        if os.path.exists(save_dir) and is_delete:
+            self._delete_dir()
 
         if not os.path.exists(self.save_documents_path):
             os.makedirs(self.save_documents_path)
@@ -38,6 +46,34 @@ class Writer:
             os.makedirs(self.save_models_path)
         if not os.path.exists(self.save_results_path):
             os.makedirs(self.save_results_path)
+
+    def _delete_dir(self):
+        """
+        删除 save_dir 文件夹。如果文件夹内存在文件的话，先验证是否存在 documents、models_trained、results 文件夹。
+        如果不同时存在这三个文件夹，则抛出 OSError 错误，因为您很有可能删除了错误的文件夹。
+        如果同时存在这三个文件夹，那么将会删除这三个文件夹内的所有文件和空文件夹，然后删除这三个文件夹。
+        最后，尝试删除 self.save_dir 文件夹，如果删除失败，则会抛出警告。
+        注：如果这三个文件夹内存在非空文件夹，那么会抛出 OSError 错误。
+        """
+        # Step 1: 验证是否存在 documents、models_trained、results 文件夹
+        if not os.path.exists(self.save_documents_path) or not os.path.exists(self.save_models_path) or not os.path.exists(self.save_results_path):
+            raise OSError(f"您很有可能删除了错误的目录或该目录存在来自其他地方的文件，当前的根目录绝对路径为：{os.path.abspath(self.save_dir)}，请仔细检查！")
+        # Step 2: 删除这三个文件夹内的所有文件
+        for path in [self.save_documents_path, self.save_models_path, self.save_results_path]:
+            for file in os.listdir(path):
+                if os.path.isfile(os.path.join(path, file)):
+                    os.remove(os.path.join(path, file))
+                elif os.path.isdir(os.path.join(path, file)):
+                    os.rmdir(os.path.join(path, file))
+        # Step 3: 删除 save_dir 文件夹
+        os.rmdir(self.save_documents_path)
+        os.rmdir(self.save_models_path)
+        os.rmdir(self.save_results_path)
+        try:
+            os.rmdir(self.save_dir)
+        except OSError:
+            warnings.warn(
+                f"删除 {self.save_dir} 文件夹失败！已删除该文件夹下的 documents、models_trained、results 文件夹！")
 
     def check_key(self, new_key, ignore_dict):
         """
@@ -137,7 +173,6 @@ class Writer:
         else:
             self.log[key] = self.log[key] + end + context
 
-
     def write_model(self, model, filename):
         """
         保存模型。模型保存目录：self.save_models_path
@@ -148,26 +183,34 @@ class Writer:
         with open(os.path.join(self.save_models_path, filename), 'wb') as f:
             pickle.dump(model, f)
 
-    def write(self):
+    def write(self, save_mode='w+'):
         """
         将暂存的指标、参数、数据、日志导出到指定的文件夹中。
+        :param save_mode: 保存模式，默认为 'w+'，即覆盖写入。如果为 'a+'，则为追加写入（可实现不同 Writer 写入同一个文件）。
         - 指标保存目录：self.save_results_path
         - 数据保存目录：self.save_results_path
         - 参数保存目录：self.save_documents_path
         - 日志保存目录：self.save_documents_path
         :return: None
         """
-        # 写入指标
+        # 写入指标类文件
         for key, value in self.metric.items():
             value.to_excel(os.path.join(self.save_results_path, f"{key}.xlsx"), index=True)
-        # 写入数据
+        # 写入数据类文件
         for key, value in self.data.items():
             value.to_csv(os.path.join(self.save_results_path, f"{key}.csv"), index=True)
-        # 写入参数
+        # 写入参数类文件
         for key, value in self.parameters.items():
-            with open(os.path.join(self.save_documents_path, f"{key}.txt"), 'w', encoding='utf-8') as f:
-                f.write(value)
-        # 写入日志
+            with open(os.path.join(self.save_documents_path, f"{key}.txt"), save_mode, encoding='utf-8') as f:
+                if save_mode == 'w+':
+                    f.write(value)
+                elif save_mode == 'a+':
+                    f.write('\n\n'+value)
+        # 写入日志类文件
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for key, value in self.log.items():
-            with open(os.path.join(self.save_documents_path, f"{key}.txt"), 'w', encoding='utf-8') as f:
-                f.write(value)
+            with open(os.path.join(self.save_documents_path, f"{key}.txt"), save_mode, encoding='utf-8') as f:
+                if save_mode == 'w+':
+                    f.write(f"{current_time}:\n{value}")
+                elif save_mode == 'a+':
+                    f.write(f"\n\n{current_time}:\n{value}")
