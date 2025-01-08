@@ -43,14 +43,14 @@ class DataParameters:
 
         # 深度学习专属参数
         """
-        - sample_data 的含义是这个样本和上个样本之间的时间间隔，如果 sample_data=1，表示连续采样。例如：
-        当前样本特征时间为 [0, 1, 2]，目标时间为 [3]；那么下一个样本的时间特征为 [0+sample_data, 1+sample_data, 2+sample_data]，
-        目标时间为 [3+sample_data]。如果是推理过程，这个值应当为 1；如果是训练过程，为了防止过拟合，可以设置为大于 1 的值，但不宜超过时间步。
+        - sample_gap 的含义是这个样本和上个样本之间的时间间隔，如果 sample_gap=1，表示连续采样。例如：
+        当前样本特征时间为 [0, 1, 2]，目标时间为 [3]；那么下一个样本的时间特征为 [0+sample_gap, 1+sample_gap, 2+sample_gap]，
+        目标时间为 [3+sample_gap]。如果是推理过程，这个值应当为 1；如果是训练过程，为了防止过拟合，可以设置为大于 1 的值，但不宜超过时间步。
         """
         self.sample_gap = 2  # 采样间隔，数据类型为 int。默认为 1，表示连续采样。该参数只在训练集上生效，在验证集和测试集上为 1。
         self.dataloader_shuffle = True  # 是否在每个 epoch 开始时打乱数据集的顺序。该参数只在训练集上生效，在验证集和测试集上为 False。
-        self.train_batch = 64  # 训练集批量大小
-        self.test_batch = 1  # 验证集、测试集批量大小
+        self.train_batch_size = 64  # 训练模型下训练集批量大小
+        self.eval_batch_size = 1  # 评估模式下训练集、验证集、测试集批量大小
 
     def __getitem__(self, item):
         return getattr(self, item)

@@ -21,7 +21,7 @@ def split_dataset(feature, target, start_position, end_position):
     :param target: 目标数据。数据类型为 DataFrame 或者 array。
     :param start_position: 切分的起始位置。如果是介于 0 和 1 之间的小数，则表示按照比例切分。如果是大于 1 的整数，则表示按照数量切分。
     :param end_position: 切分的结束位置。如果是介于 0 和 1 之间的小数，则表示按照比例切分。如果是大于 1 的整数，则表示按照数量切分。
-        Note: feature 和 target 也可以接受其他可以被 len 函数调用和可以切片的数据类型。
+        Note: feature 和 targets 也可以接受其他可以被 len 函数调用和可以切片的数据类型。
             当 start_position 和 end_position 取值为 0.0 和 1.0 时，表示按照比例切分（输入为 float 类型数据按比例切分）；
             当 start_position 和 end_position 取值为 0 和 1 时，表示按照数量切分（输入为 int 类型数据按数量切分）。
     :return: feature_split, target_split 分别表示指定范围内的特征数据和目标数据。
@@ -206,7 +206,7 @@ class DataSplit:
         """
         if (scale is None) and self.normalization:
             scale = True
-        elif (scale is None) and (not self.normalization):
+        elif (scale is None) and not self.normalization:
             scale = False
 
         if (dataname == 'train') and (scale == False):

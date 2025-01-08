@@ -43,8 +43,9 @@ def RMSE(true_value, predict_value):
 
 
 def sMAPE(true_value, predict_value):
+    epsilon = 1e-6  # 防止分母为0
     Numerator = np.abs(true_value - predict_value)
-    Denominator = (np.abs(true_value) + np.abs(predict_value)) / 2
+    Denominator = (np.abs(true_value) + np.abs(predict_value)) / 2 + epsilon
     return np.mean(Numerator / Denominator)
 
 

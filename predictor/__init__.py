@@ -16,10 +16,14 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, A
 
 from .predictor_main import Predictors
 from .predictor_utils import save_model, load_model
+from .DLModel import RNNModel, LSTMModel, GRUModel
+from .DLCriterion import MSELoss_scale, sMAPELoss
 
 
 tools = ['Predictors', 'save_model', 'load_model']
 machine_learning = ['SVR', 'Ridge', 'RandomForestRegressor', 'GradientBoostingRegressor', 'AdaBoostRegressor',
                     'BaggingRegressor']
+deep_learning = ['RNNModel', 'LSTMModel', 'GRUModel']
+deep_criterion = ['MSELoss_scale', 'sMAPELoss']
 
-__all__ = tools + machine_learning
+__all__ = tools + machine_learning + deep_learning

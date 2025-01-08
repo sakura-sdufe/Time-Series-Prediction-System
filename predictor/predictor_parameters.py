@@ -12,7 +12,10 @@
 
 class PredictorParameters:
     def __init__(self):
-        self.save_dir = './result/同频多变量预测结果（特征选择）'  # 模型保存路径
+        self.save_dir = './result/测试'  # 模型保存路径
+        self.delete_dir = False  # 是否删除 Writer 类生成的目录。（该参数仅在 Windows 系统上测试）
+        self.write_mode = 'a+'  # Writer 类写入本地模式，可选 'w+' 和 'a+'，默认为 'w+'。
+
         # Persistence 模型参数
         self.Persistence = {}
         # SVR 模型参数
@@ -82,6 +85,45 @@ class PredictorParameters:
             'n_jobs': None,  # 并行工作的数量。-1 表示使用所有可用 CPU 核心。默认为 None，表示 1。
             'random_state': None,  # 随机种子。默认为 None。
             'verbose': 0,  # 控制日志的输出量，0 表示无输出，1 表示适量输出，>1 表示详细输出。默认为 0。
+        }
+        # RNN 模型参数
+        self.RNNModel = {
+            'hidden_size': 128,  # 隐藏层节点数，默认为 128。
+            'output_size': 1,  # 输出层节点数，默认为 1。
+            'num_layers': 2,  # 网络层数，默认为 2。
+            'bidirectional': False,  # 是否使用双向RNN，默认为 False。
+            'epochs': 150,  # 训练轮数，默认为 150。
+            'learning_rate': 1e-3,  # 学习率，默认为 1e-3。
+            'clip_norm': None,  # 梯度裁剪阈值，默认为 None，表示不裁剪。
+            'ReduceLROnPlateau_factor': 0.5,  # 学习率衰减因子，默认为 0.5。
+            'ReduceLROnPlateau_patience': 10,  # 监测器函数不再减小的累计次数，默认为 10。
+            'ReduceLROnPlateau_threshold': 1e-4,  # 只关注超过阈值的显著变化，默认为 1e-4。
+        }
+        # LSTM 模型参数
+        self.LSTMModel = {
+            'hidden_size': 128,  # 隐藏层节点数，默认为 128。
+            'output_size': 1,  # 输出层节点数，默认为 1。
+            'num_layers': 2,  # 网络层数，默认为 2。
+            'bidirectional': False,  # 是否使用双向RNN，默认为 False。
+            'epochs': 150,  # 训练轮数，默认为 150。
+            'learning_rate': 1e-3,  # 学习率，默认为 1e-3。
+            'clip_norm': None,  # 梯度裁剪阈值，默认为 None，表示不裁剪。
+            'ReduceLROnPlateau_factor': 0.5,  # 学习率衰减因子，默认为 0.5。
+            'ReduceLROnPlateau_patience': 10,  # 监测器函数不再减小的累计次数，默认为 10。
+            'ReduceLROnPlateau_threshold': 1e-4,  # 只关注超过阈值的显著变化，默认为 1e-4。
+        }
+        # GRU 模型参数
+        self.GRUModel = {
+            'hidden_size': 128,  # 隐藏层节点数，默认为 128。
+            'output_size': 1,  # 输出层节点数，默认为 1。
+            'num_layers': 2,  # 网络层数，默认为 2。
+            'bidirectional': False,  # 是否使用双向RNN，默认为 False。
+            'epochs': 150,  # 训练轮数，默认为 150。
+            'learning_rate': 1e-3,  # 学习率，默认为 1e-3。
+            'clip_norm': None,  # 梯度裁剪阈值，默认为 None，表示不裁剪。
+            'ReduceLROnPlateau_factor': 0.5,  # 学习率衰减因子，默认为 0.5。
+            'ReduceLROnPlateau_patience': 10,  # 监测器函数不再减小的累计次数，默认为 10。
+            'ReduceLROnPlateau_threshold': 1e-4,  # 只关注超过阈值的显著变化，默认为 1e-4。
         }
 
     def __getitem__(self, item):

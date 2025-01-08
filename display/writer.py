@@ -11,6 +11,7 @@
 """
 
 import os
+import shutil
 import pickle
 import pandas as pd
 import warnings
@@ -51,29 +52,39 @@ class Writer:
         """
         删除 save_dir 文件夹。如果文件夹内存在文件的话，先验证是否存在 documents、models_trained、results 文件夹。
         如果不同时存在这三个文件夹，则抛出 OSError 错误，因为您很有可能删除了错误的文件夹。
-        如果同时存在这三个文件夹，那么将会删除这三个文件夹内的所有文件和空文件夹，然后删除这三个文件夹。
-        最后，尝试删除 self.save_dir 文件夹，如果删除失败，则会抛出警告。
-        注：如果这三个文件夹内存在非空文件夹，那么会抛出 OSError 错误。
+        如果同时存在这三个文件夹，那么将会删除这三个文件夹内的所有文件（包括这三个文件夹）。
+        最后，检查 self.save_dir 文件夹中是否有其他文件，如果有，则提示用户到资源管理器中核验，是否继续删除。
         """
         # Step 1: 验证是否存在 documents、models_trained、results 文件夹
         if not os.path.exists(self.save_documents_path) or not os.path.exists(self.save_models_path) or not os.path.exists(self.save_results_path):
             raise OSError(f"您很有可能删除了错误的目录或该目录存在来自其他地方的文件，当前的根目录绝对路径为：{os.path.abspath(self.save_dir)}，请仔细检查！")
-        # Step 2: 删除这三个文件夹内的所有文件
+        # Step 2: 删除这三个文件夹及其内部文件
         for path in [self.save_documents_path, self.save_models_path, self.save_results_path]:
-            for file in os.listdir(path):
-                if os.path.isfile(os.path.join(path, file)):
-                    os.remove(os.path.join(path, file))
-                elif os.path.isdir(os.path.join(path, file)):
-                    os.rmdir(os.path.join(path, file))
-        # Step 3: 删除 save_dir 文件夹
-        os.rmdir(self.save_documents_path)
-        os.rmdir(self.save_models_path)
-        os.rmdir(self.save_results_path)
-        try:
+            while True:
+                verify = input(f"您确定要删除 '{path}' 文件夹及其内部文件吗？删除将无法恢复，请谨慎选择！(y/n)")
+                if verify.lower() == 'y':
+                    shutil.rmtree(path)
+                    print(f"删除 '{path}' 文件夹及其内部文件成功！")
+                    break
+                elif verify.lower() == 'n':
+                    print(f"取消删除 '{path}' 文件夹及其内部文件！")
+                    break
+                else:
+                    print("输入错误，请重新输入！")
+                    continue
+        # Step 3: 检查 self.save_dir 文件夹中是否有其他文件
+        if os.listdir(self.save_dir):
+            os.startfile(self.save_dir)
+            print(f"根目录 '{self.save_dir}' 中存在非 Writer 类产生的文件，已在资源管理器中打开该目录，请仔细核验！")
+            verify = input("请到资源管理器中仔细核验当前目录下的文件，删除将无法恢复，是否继续删除（摁下除 'y' 以外所有键取消删除）？")
+            if verify.lower() == 'y':
+                shutil.rmtree(self.save_dir)
+                print(f"根目录 '{self.save_dir}' 删除成功！")
+            else:
+                print(f"取消删除根目录 '{self.save_dir}'！")
+        else:
             os.rmdir(self.save_dir)
-        except OSError:
-            warnings.warn(
-                f"删除 {self.save_dir} 文件夹失败！已删除该文件夹下的 documents、models_trained、results 文件夹！")
+            print(f"根目录 '{self.save_dir}' 删除成功！")
 
     def check_key(self, new_key, ignore_dict):
         """
@@ -193,24 +204,36 @@ class Writer:
         - 日志保存目录：self.save_documents_path
         :return: None
         """
+        assert save_mode in ['w+', 'a+'], "保存模式只能为 'w+' 或 'a+'！"
         # 写入指标类文件
         for key, value in self.metric.items():
-            value.to_excel(os.path.join(self.save_results_path, f"{key}.xlsx"), index=True)
+            if (save_mode == 'a+') and os.path.exists(os.path.join(self.save_results_path, f"{key}.xlsx")):
+                exist_excel = pd.read_excel(os.path.join(self.save_results_path, f"{key}.xlsx"), index_col=0)
+                new_csv = pd.concat([exist_excel, value], axis=0)
+                new_csv.to_excel(os.path.join(self.save_results_path, f"{key}.xlsx"), index=True)
+            else:
+                value.to_excel(os.path.join(self.save_results_path, f"{key}.xlsx"), index=True)
         # 写入数据类文件
         for key, value in self.data.items():
-            value.to_csv(os.path.join(self.save_results_path, f"{key}.csv"), index=True)
+            if (save_mode == 'a+') and os.path.exists(os.path.join(self.save_results_path, f"{key}.csv")):
+                exist_csv = pd.read_csv(os.path.join(self.save_results_path, f"{key}.csv"), index_col=0)
+                new_csv = pd.concat([exist_csv, value], axis=1)
+                new_csv.to_csv(os.path.join(self.save_results_path, f"{key}.csv"), index=True)
+            else:
+                value.to_csv(os.path.join(self.save_results_path, f"{key}.csv"), index=True)
         # 写入参数类文件
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for key, value in self.parameters.items():
             with open(os.path.join(self.save_documents_path, f"{key}.txt"), save_mode, encoding='utf-8') as f:
                 if save_mode == 'w+':
-                    f.write(value)
+                    f.write(f"{current_time}\n{value}")
                 elif save_mode == 'a+':
-                    f.write('\n\n'+value)
+                    f.write(f"\n\n{current_time}\n{value}")
         # 写入日志类文件
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for key, value in self.log.items():
             with open(os.path.join(self.save_documents_path, f"{key}.txt"), save_mode, encoding='utf-8') as f:
                 if save_mode == 'w+':
-                    f.write(f"{current_time}:\n{value}")
+                    f.write(f"{current_time}\n{value}")
                 elif save_mode == 'a+':
-                    f.write(f"\n\n{current_time}:\n{value}")
+                    f.write(f"\n\n{current_time}\n{value}")
