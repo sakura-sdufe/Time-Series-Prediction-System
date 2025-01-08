@@ -19,7 +19,7 @@ from data import DataSplit
 from metrics import calculate_metrics
 from display import cprint, Drawer, Writer
 
-from parameters import PredictorParameters
+from .predictor_parameters import PredictorParameters
 
 
 class Predictors:
@@ -93,7 +93,7 @@ class Predictors:
               save_figure=True, show_result=True, show_figure=False, to_save=True):
         """
         训练和预测一个模型，并保存结果和评估指标。
-        :param predictor: 模型类，不需要实例化。
+        :param predictor: 模型类，不需要实例化。需要有 fit 和 predict 方法。
         :param predictor_parameters: 模型参数，dict 类型。
         :param is_normalization: 是否标准化，默认为 True。
         :param figure_type: 图像保存类型，默认为 'svg'。
