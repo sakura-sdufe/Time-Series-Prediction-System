@@ -9,8 +9,3 @@
 # @Function : 
 -------------------------------------------------
 """
-
-from .RNNs import RNNModel, LSTMModel, GRUModel
-
-
-__all__ = ['RNNModel', 'LSTMModel', 'GRUModel']

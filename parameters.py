@@ -12,8 +12,9 @@
 
 from data.data_parameters import DataParameters
 from predictor.predictor_parameters import PredictorParameters
+from project_parameters import ProjectParameters
 
 
 # 是否可以考虑使用多个类的继承和多个类的初始化，实现参数的初始化传递。
 
-__all__ = ['DataParameters', 'PredictorParameters']
+__all__ = ['DataParameters', 'PredictorParameters', 'ProjectParameters']

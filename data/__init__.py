@@ -10,11 +10,13 @@
 -------------------------------------------------
 """
 
+from .data_selection import select_best_feature
+
 from .data_scale.norm import Norm
 from .data_scale.min_max import MinMax
 
 from .data_encapsulation.data_convert import DataSplit
-from .data_encapsulation.data_loader import Seqset, SeqLoader
+from .data_encapsulation.data_loader import SeqDataset, SeqLoader
 
 
-__all__ = ['Norm', 'MinMax', 'DataSplit', 'Seqset', 'SeqLoader']
+__all__ = ['select_best_feature', 'Norm', 'MinMax', 'DataSplit', 'SeqDataset', 'SeqLoader']

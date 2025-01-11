@@ -18,11 +18,11 @@ from torch.utils.data import Dataset, DataLoader
 from .data_convert import split_dataset
 
 
-class Seqset(Dataset):
+class SeqDataset(Dataset):
     def __init__(self, feature, target):
         """
         将 Tensor 数据转化成 Dataset 类型数据。
-        :param feature: 3D Tensor, 维度为：(sample_number, time_step, feature_number)。
+        :param feature: 3D Tensor, 维度为：(sample_number, time_step, number)。
         :param target: 1D Tensor, 维度为：(sample_number,)。
         """
         self.feature = feature
@@ -33,7 +33,7 @@ class Seqset(Dataset):
         """
         根据索引返回数据集中的一个样本。
         :param item: 表示需要获取的样本索引，int 类型。
-        :return: 返回一个 torch.Tensor 类型的样本，特征的尺寸为 (time_step, feature_number)，目标的尺寸为 (batch_size,)。
+        :return: 返回一个 torch.Tensor 类型的样本，特征的尺寸为 (time_step, number)，目标的尺寸为 (batch_size,)。
         """
         return self.feature[item], self.target[item]
 
@@ -85,7 +85,7 @@ class SeqLoader:
         # 将特征和目标转为 Tensor 类型数据
         feature_origin = torch.tensor(self.feature, dtype=torch.float32)
         target_origin = torch.tensor(self.target, dtype=torch.float32)
-        # 将时序的特征和目标转为样本的特征和目标，特征维度：(sample_number, time_step, feature_number)，目标维度：(sample_number,)
+        # 将时序的特征和目标转为样本的特征和目标，特征维度：(sample_number, time_step, number)，目标维度：(sample_number,)
         feature_origin_sample = torch.stack([feature_origin[start:start+self.time_step, :] for start in self.position])
         target_origin_sample = torch.tensor([target_origin[start + self.time_step].item() for start in self.position])
         # 划分训练集、验证集和测试集
@@ -98,10 +98,10 @@ class SeqLoader:
         test_feature_origin, test_target_origin = split_dataset(
             feature_origin_sample, target_origin_sample, self.test_start_rate, self.test_end_rate)
         # 封装为 Dataset 类型数据
-        self.train_dataset_origin = Seqset(train_feature_origin, train_target_origin)
-        self.train_eval_dataset_origin = Seqset(train_eval_feature_origin, train_eval_target_origin)
-        self.valid_dataset_origin = Seqset(valid_feature_origin, valid_target_origin)
-        self.test_dataset_origin = Seqset(test_feature_origin, test_target_origin)
+        self.train_dataset_origin = SeqDataset(train_feature_origin, train_target_origin)
+        self.train_eval_dataset_origin = SeqDataset(train_eval_feature_origin, train_eval_target_origin)
+        self.valid_dataset_origin = SeqDataset(valid_feature_origin, valid_target_origin)
+        self.test_dataset_origin = SeqDataset(test_feature_origin, test_target_origin)
         # 封装为 DataLoader 类型数据
         self.train_dataloader_origin = DataLoader(self.train_dataset_origin,
                                                   batch_size=self.parameters_data["train_batch_size"],
@@ -124,7 +124,7 @@ class SeqLoader:
         target_norm = self.normalization_target.get_norm_result()
         feature_norm = torch.tensor(feature_norm, dtype=torch.float32)
         target_norm = torch.tensor(target_norm, dtype=torch.float32)
-        # 将时序的特征和目标转为样本的特征和目标，特征维度：(sample_number, time_step, feature_number)，目标维度：(sample_number,)
+        # 将时序的特征和目标转为样本的特征和目标，特征维度：(sample_number, time_step, number)，目标维度：(sample_number,)
         feature_norm_sample = torch.stack([feature_norm[start:start+self.time_step, :] for start in self.position])
         target_norm_sample = torch.tensor([target_norm[start+self.time_step].item() for start in self.position])
         # 划分训练集、验证集和测试集
@@ -137,10 +137,10 @@ class SeqLoader:
         test_feature_norm, test_target_norm = split_dataset(
             feature_norm_sample, target_norm_sample, self.test_start_rate, self.test_end_rate)
         # 封装为 Dataset 类型数据
-        self.train_dataset_norm = Seqset(train_feature_norm, train_target_norm)
-        self.train_eval_dataset_norm = Seqset(train_eval_feature_norm, train_eval_target_norm)
-        self.valid_dataset_norm = Seqset(valid_feature_norm, valid_target_norm)
-        self.test_dataset_norm = Seqset(test_feature_norm, test_target_norm)
+        self.train_dataset_norm = SeqDataset(train_feature_norm, train_target_norm)
+        self.train_eval_dataset_norm = SeqDataset(train_eval_feature_norm, train_eval_target_norm)
+        self.valid_dataset_norm = SeqDataset(valid_feature_norm, valid_target_norm)
+        self.test_dataset_norm = SeqDataset(test_feature_norm, test_target_norm)
         # 封装为 DataLoader 类型数据
         self.train_dataloader_norm = DataLoader(self.train_dataset_norm,
                                                 batch_size=self.parameters_data["train_batch_size"],

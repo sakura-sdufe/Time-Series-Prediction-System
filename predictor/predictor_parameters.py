@@ -12,10 +12,7 @@
 
 class PredictorParameters:
     def __init__(self):
-        self.save_dir = './result/测试'  # 模型保存路径
-        self.delete_dir = False  # 是否删除 Writer 类生成的目录。（该参数仅在 Windows 系统上测试）
-        self.write_mode = 'a+'  # Writer 类写入本地模式，可选 'w+' 和 'a+'，默认为 'w+'。
-
+        """类内变量名需与模型类名保持一致，否则无法正常解析。"""
         # Persistence 模型参数
         self.Persistence = {}
         # SVR 模型参数
@@ -92,12 +89,6 @@ class PredictorParameters:
             'output_size': 1,  # 输出层节点数，默认为 1。
             'num_layers': 2,  # 网络层数，默认为 2。
             'bidirectional': False,  # 是否使用双向RNN，默认为 False。
-            'epochs': 150,  # 训练轮数，默认为 150。
-            'learning_rate': 1e-3,  # 学习率，默认为 1e-3。
-            'clip_norm': None,  # 梯度裁剪阈值，默认为 None，表示不裁剪。
-            'ReduceLROnPlateau_factor': 0.5,  # 学习率衰减因子，默认为 0.5。
-            'ReduceLROnPlateau_patience': 10,  # 监测器函数不再减小的累计次数，默认为 10。
-            'ReduceLROnPlateau_threshold': 1e-4,  # 只关注超过阈值的显著变化，默认为 1e-4。
         }
         # LSTM 模型参数
         self.LSTMModel = {
@@ -105,12 +96,6 @@ class PredictorParameters:
             'output_size': 1,  # 输出层节点数，默认为 1。
             'num_layers': 2,  # 网络层数，默认为 2。
             'bidirectional': False,  # 是否使用双向RNN，默认为 False。
-            'epochs': 150,  # 训练轮数，默认为 150。
-            'learning_rate': 1e-3,  # 学习率，默认为 1e-3。
-            'clip_norm': None,  # 梯度裁剪阈值，默认为 None，表示不裁剪。
-            'ReduceLROnPlateau_factor': 0.5,  # 学习率衰减因子，默认为 0.5。
-            'ReduceLROnPlateau_patience': 10,  # 监测器函数不再减小的累计次数，默认为 10。
-            'ReduceLROnPlateau_threshold': 1e-4,  # 只关注超过阈值的显著变化，默认为 1e-4。
         }
         # GRU 模型参数
         self.GRUModel = {
@@ -118,6 +103,35 @@ class PredictorParameters:
             'output_size': 1,  # 输出层节点数，默认为 1。
             'num_layers': 2,  # 网络层数，默认为 2。
             'bidirectional': False,  # 是否使用双向RNN，默认为 False。
+        }
+        # TransformerWithLinear 模型参数
+        self.TransformerWithLinear = {
+            'output_size': 1,  # 输出层节点数，默认为 1。
+            'encoder_model_dim': 128,  # 编码器 TransformerEncoderLayer 模型维度，默认为 128。
+            'encoder_head_num': 8,  # 编码器 TransformerEncoderLayer 多头注意力机制的头数，默认为 8。
+            'encoder_feedforward_dim': 2048,  # 编码器 TransformerEncoderLayer 前馈神经网络的隐藏层维度，默认为 2048。
+            'encoder_layer_num': 2,  # 编码器 TransformerEncoderLayer 层数，默认为 2。
+            'decoder_hidden_sizes': [1024, 256, 32],  # 解码器全连接层的隐藏层维度列表，默认为 None，表示直接映射到输出维度。
+            'activation': 'relu',  # 编码器和解码器的激活函数，默认为 'relu'。
+            'dropout': 0.1,  # 编码器 TransformerEncoderLayer 和 解码器全连接层的 dropout 概率，默认为 0.1。
+            'max_length': 100,  # 位置编码的最大长度，默认为 1000。主要用于位置编码。注：该参数值必须要大于时间步。
+        }
+        # TransformerWithAttention 模型参数
+        self.TransformerWithAttention = {
+            'output_size': 1,  # 输出层节点数，默认为 1。
+            'encoder_model_dim': 128,  # 编码器 TransformerEncoderLayer 模型维度，默认为 128。
+            'encoder_head_num': 8,  # 编码器 TransformerEncoderLayer 多头注意力机制的头数，默认为 8。
+            'encoder_feedforward_dim': 2048,  # 编码器 TransformerEncoderLayer 前馈神经网络的隐藏层维度，默认为 2048。
+            'encoder_layer_num': 2,  # 编码器 TransformerEncoderLayer 层数，默认为 2。
+            'decoder_model_dim': 128,  # 解码器 MultiHeadAttention 模型维度，默认值为 128。
+            'decoder_head_num': 8,  # 解码器 MultiHeadAttention 多头注意力机制的头数，默认值为 8。
+            'decoder_feedforward_dim': 2048,  # 解码器 MultiHeadAttention 前馈神经网络的隐藏层维度，默认值为 2048。
+            'decoder_layer_num': 2,  # 解码器 MultiHeadAttention 层数，默认值为 2。
+            'activation': 'relu',  # 编码器和解码器的激活函数，默认为 'relu'。
+            'dropout': 0.1,  # 编码器 TransformerEncoderLayer 和 解码器 MultiHeadAttention 的 dropout 概率，默认为 0.1。
+            'max_length': 100,  # 位置编码的最大长度，默认为 1000。主要用于位置编码。注：该参数值必须要大于时间步。
+        }
+        self.DL_train = {
             'epochs': 150,  # 训练轮数，默认为 150。
             'learning_rate': 1e-3,  # 学习率，默认为 1e-3。
             'clip_norm': None,  # 梯度裁剪阈值，默认为 None，表示不裁剪。

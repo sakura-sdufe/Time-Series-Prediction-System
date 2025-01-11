@@ -10,9 +10,12 @@
 -------------------------------------------------
 """
 
-from .cprint import cprint
-from .drawer import Drawer
-from .writer import Writer
+from .Cprint import cprint
+from .Writer import Writer
+from .Animator import Animator
+from .Accumulator import Accumulator
+from .Timer import Timer
+from .device_gpu import try_gpu
 
 
-__all__ = ['cprint', 'Drawer', 'Writer']
+__all__ = ['cprint', 'Writer', 'Animator', 'Accumulator', 'Timer', 'try_gpu']

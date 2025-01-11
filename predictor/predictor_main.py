@@ -21,34 +21,24 @@ from typing import List, Dict, Tuple, Union
 
 from data import DataSplit, SeqLoader
 from metrics import calculate_metrics
-from display import cprint, Drawer, Writer
+from utils import cprint, Writer
 
 from .predictor_parameters import PredictorParameters
 
 
 class Predictors:
-    def __init__(self, data_split: DataSplit, seq_loader: SeqLoader, save_relpath:str, *,
-                 x_label='时间', y_label='预测结果', write_mode='w+'):
+    def __init__(self, data_split: DataSplit, seq_loader: SeqLoader, *, writer: Writer):
         """
         预测器类，用于训练和预测多个模型，并保存结果和评估指标。
         :param data_split: 机器学习数据集划分类，数据类型为 DataSplit 类的实例。
         :param seq_loader: 深度学习数据集封装类，数据类型为 SeqLoader 类的实例。
-        :param save_relpath: 保存路径的相对路径
-        :param x_label: x 轴标签
-        :param y_label: y 轴标签
-        :param write_mode: Writer 类写入本地模式，可选 'w+' 和 'a+'，默认为 'w+'。
+        :param writer: Writer 类的实例，用于保存预测结果、评价指标和训练后的模型。
         """
         # 转为类内属性
         self.data_split = data_split  # 机器学习数据集划分类
         self.seq_loader = seq_loader  # 深度学习数据集封装类
-        self.write_mode = write_mode  # Writer 类写入本地模式
-
-        # 将 parameters_predictor['save_dir'] 中的相对路径转为绝对路径
-        current_dir = os.path.dirname(os.path.abspath(__file__))  # 当前文件绝对路径
-        self.save_dir = os.path.join(os.path.dirname(current_dir), save_relpath.strip(r"./\\"))  # 保存路径
-
-        self.writer = Writer(self.save_dir)  # 实例化 Writer 类，用于保存预测结果、评价指标和训练后的模型
-        self.drawer = Drawer(self.save_dir, xlabel=x_label, ylabel=y_label)  # 实例化 Drawer 类，用于绘制预测结果
+        self.writer = writer  # Writer 类的实例，用于保存预测结果、评价指标和训练后的模型
+        self.save_dir:str = self.writer.save_dir  # 保存路径
 
         self.ML_normalization_target, self.DL_normalization_target = None, None  # 机器学习和深度学习目标标准化类
         # 机器学习数据集
@@ -147,30 +137,23 @@ class Predictors:
         :return: 训练后的模型, 各数据集预测结果。
         """
         # 从 predictor_parameters 和 kwargs 筛选出深度学习模型参数 和 深度学习训练参数
-        model_known_parameters = [
-            'input_size', 'hidden_size', 'output_size', 'num_layers', 'bidirectional'
-        ]
-        train_known_parameters = [
+        train_known_parameters = (
             'epochs', 'clip_norm', 'device', 'best_model_dir', 'loss_figure_path',
             'monitor_figure_path', 'loss_result_path', 'monitor_result_path', 'monitor_name', 'loss_title',
             'monitor_title', 'loss_yscale', 'monitor_yscale'
-        ]
-        ignore_parameters = [
+        )
+        ignore_parameters = (
             'learning_rate', 'ReduceLROnPlateau_factor', 'ReduceLROnPlateau_patience', 'ReduceLROnPlateau_threshold'
-        ]
-        predictor_parameters.update(kwargs)  # 更新参数
+        )
+        predictor_parameters.update(kwargs)  # 更新参数。这里的更新会影响 self.model 方法中的参数，但初始化模型和训练用的就是这组参数，这是一件好事。
         model_parameters, train_parameters = dict(), dict()
         for key in predictor_parameters.keys():
-            if key in model_known_parameters:
-                model_parameters[key] = predictor_parameters[key]
-            elif key in train_known_parameters:
+            if key in train_known_parameters:
                 train_parameters[key] = predictor_parameters[key]
             elif key in ignore_parameters:
                 continue
             else:
-                warnings.warn(
-                    f"位于 predictor_parameters 中的参数 {key} 没有包含在已知的深度学习模型参数或深度学习训练参数中！该参数已被忽略。",
-                    category=RuntimeWarning)
+                model_parameters[key] = predictor_parameters[key]
         # 添加模型参数 input_size 和 训练参数 monitor_name。
         model_parameters['input_size'] = self.train_trainer.dataset.input_size
         if 'monitor_name' not in train_parameters:
@@ -194,6 +177,7 @@ class Predictors:
         train_parameters['monitor_figure_path'] = os.path.join(figure_dir, predictor.__name__+'监视值曲线.'+figure_type)
         train_parameters['loss_result_path'] = os.path.join(result_dir, predictor.__name__+'损失值.csv')
         train_parameters['monitor_result_path'] = os.path.join(result_dir, predictor.__name__+'监视值.csv')
+        train_parameters['lr_sec_path'] = os.path.join(result_dir, predictor.__name__+'学习率与每秒样本数.csv')
         # 实例化深度学习模型
         model = predictor(**model_parameters)
         criterion_instance = criterion()
@@ -205,13 +189,15 @@ class Predictors:
             threshold=predictor_parameters['ReduceLROnPlateau_threshold']
         )
         if is_normalization:
-            model.fit(self.train_trainer_norm, self.valid_evaler_norm, criterion=criterion_instance, optimizer=optimizer,
+            model.fit(train_trainer=self.train_trainer_norm, train_evaler=self.train_evaler_norm,
+                      valid_evaler=self.valid_evaler_norm, criterion=criterion_instance, optimizer=optimizer,
                       scheduler=scheduler, monitor=monitor_instance, **train_parameters)
             train_predict = self.DL_normalization_target.denorm(model.predict(self.train_evaler_norm).cpu().flatten().numpy())
             valid_predict = self.DL_normalization_target.denorm(model.predict(self.valid_evaler_norm).cpu().flatten().numpy())
             test_predict = self.DL_normalization_target.denorm(model.predict(self.test_evaler_norm).cpu().flatten().numpy())
         else:
-            model.fit(self.train_trainer, self.valid_evaler, criterion=criterion_instance, optimizer=optimizer,
+            model.fit(train_trainer=self.train_trainer, train_evaler=self.train_evaler,
+                      valid_evaler=self.valid_evaler, criterion=criterion_instance, optimizer=optimizer,
                       scheduler=scheduler, monitor=monitor_instance, **train_parameters)
             train_predict = model.predict(self.train_evaler).cpu().flatten().numpy()
             valid_predict = model.predict(self.valid_evaler).cpu().flatten().numpy()
@@ -219,8 +205,8 @@ class Predictors:
         return model, (train_predict, valid_predict, test_predict)
 
     def model(self, predictor, predictor_parameters:Dict, *, is_normalization=True, figure_type='svg',
-              save_result=True, save_figure=True, show_result=True, show_figure=False, to_save=True, write_mode='w+',
-              criterion=None, monitor=None, **kwargs):
+              save_result=True, save_figure=True, show_result=True, show_figure=False, criterion=None, monitor=None,
+              train_parameters:Dict=None, **kwargs):
         """
         训练和预测一个模型，并保存结果和评估指标。
         :param predictor: 模型类，不需要实例化。需要有 fit 和 predict 方法。
@@ -231,11 +217,10 @@ class Predictors:
         :param save_figure: 是否保存预测结果走势图，默认为 True。
         :param show_result: 是否在控制台打印预测指标信息，默认为 True。
         :param show_figure: 是否展示绘制的预测结果走势图，默认为 False。
-        :param to_save: 是否将保存的结果导出到本地文件，默认为 True。如果为 False，则只是将 save_result 的结果进行暂存，不导出到本地文件。
-                        可以通过 predictors.writer.write() 方法将暂存的结果导出到本地文件。
-        :param write_mode: Writer 类写入本地模式，可选 'w+' 和 'a+'，默认为 'w+'。
         :param criterion: 深度学习损失函数类，无需实例化，深度学习必须参数。
         :param monitor: 深度学习模型监视器类，无需实例化，深度学习必须参数。
+        :param train_parameters: 深度学习训练参数，Dict 类型，深度学习必须参数。该字典必须包含 epochs, learning_rate, clip_norm,
+                                ReduceLROnPlateau_factor, ReduceLROnPlateau_patience, ReduceLROnPlateau_threshold 键值对。
         :param kwargs: 其他参数。一般用于接收深度学习模型训练参数（来自 sklearn 的模型不可用）。具体参数可以参考深度学习模型的 fit 方法。
                         常用参数有：monitor_name, loss_title, monitor_title, loss_yscale, monitor_yscale。
                         在深度学习模型中，虽然 kwargs 也可以接受并更改 predictor_parameters 中的参数，但是不推荐这样做。
@@ -250,6 +235,7 @@ class Predictors:
         if issubclass(predictor, base.BaseEstimator):
             model, predict_result = self.ML(predictor, predictor_parameters, is_normalization)
         elif issubclass(predictor, nn.Module):
+            kwargs.update(train_parameters)
             model, predict_result = self.DL(predictor, predictor_parameters, is_normalization, criterion, monitor,
                                             figure_type=figure_type, **kwargs)
         else:
@@ -264,15 +250,15 @@ class Predictors:
         if show_figure or save_figure:
             title = f"{predictor_name} 训练集预测"
             filename = title + '.' + figure_type if save_figure else None
-            self.drawer.draw([self.train_target, train_predict], title=title, legend=['true', predictor_name],
+            self.writer.draw([self.train_target, train_predict], title=title, legend=['true', predictor_name],
                              filename=filename, show=show_figure)
             title = f"{predictor_name} 验证集预测"
             filename = title + '.' + figure_type if save_figure else None
-            self.drawer.draw([self.valid_target, valid_predict], title=title, legend=['true', predictor_name],
+            self.writer.draw([self.valid_target, valid_predict], title=title, legend=['true', predictor_name],
                              filename=filename, show=show_figure)
             title = f"{predictor_name} 测试集预测"
             filename = title + '.' + figure_type if save_figure else None
-            self.drawer.draw([self.test_target, test_predict], title=title, legend=['true', predictor_name],
+            self.writer.draw([self.test_target, test_predict], title=title, legend=['true', predictor_name],
                              filename=filename, show=show_figure)
         end_time = time.perf_counter()
         if show_result:
@@ -298,15 +284,12 @@ class Predictors:
             self.writer.add_metrics(metrics_df=pd.DataFrame(train_metrics, index=[predictor_name]), axis=0, key="train metrics")
             self.writer.add_metrics(metrics_df=pd.DataFrame(valid_metrics, index=[predictor_name]), axis=0, key="valid metrics")
             self.writer.add_metrics(metrics_df=pd.DataFrame(test_metrics, index=[predictor_name]), axis=0, key="test metrics")
-            self.writer.add_log(f"{predictor_name} 模型训续和预测用时 {end_time - start_time} 秒。", key="log")
+            self.writer.add_log(f"{predictor_name} 模型训续和预测用时 {(end_time - start_time):.2f} 秒。", key="log")
             self.writer.add_parameters(content_text=f"{predictor_name} 模型参数", content_dict=predictor_parameters,
                                        key="predictor parameters")
-        if to_save:
-            self.writer.write(self.write_mode)
         return model
 
-    def persistence(self, *, figure_type='svg', save_result=True, save_figure=True, show_result=True, show_figure=False,
-                    to_save=True, write_mode='w+'):
+    def persistence(self, *, figure_type='svg', save_result=True, save_figure=True, show_result=True, show_figure=False):
         """
         计算 Persistence 模型的预测结果和评估指标。
         :param figure_type: 图像保存类型，默认为 'svg'。
@@ -314,9 +297,6 @@ class Predictors:
         :param save_figure: 是否保存图像，默认为 True。
         :param show_result: 是否显示结果，默认为 True。
         :param show_figure: 是否显示图像，默认为 False。
-        :param to_save: 是否将保存的结果导出到本地文件，默认为 True。如果为 False，则只是将 save_result 的结果进行暂存，不导出到本地文件。
-                        可以通过 predictors.writer.write() 方法将暂存的结果导出到本地文件。
-        :param write_mode: Writer 类写入本地模式，可选 'w+' 和 'a+'，默认为 'w+'。
         :return:
         """
         start_time = time.time()
@@ -334,15 +314,15 @@ class Predictors:
         if show_figure or save_figure:
             title = f"Persistence 训练集预测"
             filename = title + '.' + figure_type if save_figure else None
-            self.drawer.draw([self.train_target, train_predict], title=title, legend=['true', "Persistence"],
+            self.writer.draw([self.train_target, train_predict], title=title, legend=['true', "Persistence"],
                              filename=filename, show=show_figure)
             title = f"Persistence 验证集预测"
             filename = title + '.' + figure_type if save_figure else None
-            self.drawer.draw([self.valid_target, valid_predict], title=title, legend=['true', "Persistence"],
+            self.writer.draw([self.valid_target, valid_predict], title=title, legend=['true', "Persistence"],
                              filename=filename, show=show_figure)
             title = f"Persistence 测试集预测"
             filename = title + '.' + figure_type if save_figure else None
-            self.drawer.draw([self.test_target, test_predict], title=title, legend=['true', "Persistence"],
+            self.writer.draw([self.test_target, test_predict], title=title, legend=['true', "Persistence"],
                              filename=filename, show=show_figure)
         end_time = time.time()
         if show_result:
@@ -366,14 +346,12 @@ class Predictors:
             self.writer.add_metrics(metrics_df=pd.DataFrame(train_metrics, index=["Persistence"]), axis=0, key="train metrics")
             self.writer.add_metrics(metrics_df=pd.DataFrame(valid_metrics, index=["Persistence"]), axis=0, key="valid metrics")
             self.writer.add_metrics(metrics_df=pd.DataFrame(test_metrics, index=["Persistence"]), axis=0, key="test metrics")
-            self.writer.add_log(f"Persistence 模型训续和预测用时 {end_time - start_time} 秒。", key="log")
-        if to_save:
-            self.writer.write(self.write_mode)
+            self.writer.add_log(f"Persistence 模型训续和预测用时 {(end_time - start_time):.2f} 秒。", key="log")
         return None
 
     def all_models(self, models: Union[List,Tuple], parameters: PredictorParameters, is_normalization:Union[List,Tuple,bool]=True,
                    *, figure_type='svg', save_result=True, save_figure=True, show_result=True, show_figure=False,
-                   to_save=True, write_mode='w+', criterion=None, monitor=None, **kwargs) -> List:
+                   criterion=None, monitor=None, **kwargs) -> List:
         """
         训练和预测多个模型，并保存结果和评估指标。
         :param models: 由模型类构成的 list 或 tuple，不需要实例化。
@@ -385,9 +363,6 @@ class Predictors:
         :param save_figure: 是否保存图像，默认为 True。
         :param show_result: 是否显示结果，默认为 True。
         :param show_figure: 是否显示图像，默认为 False。
-        :param to_save: 是否将保存的结果导出到本地文件，默认为 True。如果为 False，则只是将 save_result 的结果进行暂存，不导出到本地文件。
-                        可以通过 predictors.writer.write() 方法将暂存的结果导出到本地文件。
-        :param write_mode: Writer 类写入本地模式，可选 'w+' 和 'a+'，默认为 'w+'。
         :param criterion: 深度学习损失函数类，无需实例化，深度学习必须参数。
         :param monitor: 深度学习模型监视器类，无需实例化，深度学习必须参数。
         :param kwargs: 其他参数。一般用于接收深度学习模型训练参数（来自 sklearn 的模型不可用），具体参数 model 方法。
@@ -397,15 +372,13 @@ class Predictors:
             is_normalization = [is_normalization] * len(models)
         trained_models = []
         self.persistence(figure_type=figure_type, save_result=save_result, save_figure=save_figure, show_result=show_result,
-                         show_figure=show_figure, to_save=False, write_mode=write_mode)
+                         show_figure=show_figure)
         for m, is_norm in zip(models, is_normalization):
             m = self.model(m, parameters[m.__name__], is_normalization=is_norm, figure_type=figure_type,
                            save_result=save_result, save_figure=save_figure, show_result=show_result,
-                           show_figure=show_figure, to_save=False, write_mode=write_mode, criterion=criterion,
-                           monitor=monitor, **kwargs)
+                           show_figure=show_figure, criterion=criterion, monitor=monitor,
+                           train_parameters=parameters['DL_train'], **kwargs)
             trained_models.append(m)
-        if to_save:
-            self.writer.write(self.write_mode)
         return trained_models
 
     def __getitem__(self, item):

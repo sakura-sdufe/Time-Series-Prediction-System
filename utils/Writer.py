@@ -4,7 +4,7 @@
 # @Project  : Graduation-Project
 # @Time     : 2024/11/20 15:24
 # @Author   : 张浩
-# @FileName : writer.py
+# @FileName : Writer.py
 # @Software : PyCharm
 # @Function : 
 -------------------------------------------------
@@ -13,53 +13,74 @@
 import os
 import shutil
 import pickle
+import numpy as np
 import pandas as pd
-import warnings
-
+from copy import deepcopy
 from datetime import datetime
+from matplotlib import pyplot as plt
+from matplotlib_inline import backend_inline  # 设置图片以SVG格式显示
+
+from .Cprint import cprint
 
 
 class Writer:
-    def __init__(self, save_dir, is_delete=False):
+    def __init__(self, save_dir, is_delete=False, *, fmts=None, figsize=None, **kwargs):
         """
         写入指标、参数、数据、日志；保存模型
-        :param save_dir: 保存的根目录
-        :param is_delete: 是否删除原有的 save_dir 文件夹
+        :param save_dir: 保存的根目录，要求为绝对地址。
+        :param is_delete: 是否删除原有的 save_dir 文件夹。
+        :param fmts: 图像的格式，例如：['b-', 'm--', 'g-.', 'r:']。
+        :param figsize: 图窗大小，例如：(7, 5)。
+        :param kwargs: 其他图窗相关参数。
         """
+        if not os.path.isabs(save_dir):
+            raise ValueError(f"输入的根目录参数 {save_dir} 不是绝对路径！")
+
+        # draw 绘图方法参数
+        if fmts is None:
+            fmts = ['C0-', 'C1--', 'C2-.', 'C3:', 'C4-', 'C5--', 'C6-.', 'C7:', 'C8-', 'C9--']
+        if figsize is None:
+            figsize = (7, 5)
+        self.fmts, self.figsize = fmts, figsize
+        self.init_axes_set = kwargs
+
         # 指标、参数、数据的索引
-        self.metric_key_index, self.parameter_key_index, self.data_key_index = 0, 0, 0
+        self.metric_key_index, self.parameter_key_index, self.data_key_index, self.log_key_index = 0, 0, 0, 0
         self.metric = dict() # 指标（key 为关键词，value:pd.DataFrame 为所存储的指标）
         self.parameters = dict()  # 参数（key 为关键词，value:str 为所存储的参数）
         self.data = dict()  # 数据（key 为关键词，value:pd.DataFrame 为所存储的数据）
         self.log = dict()  # 日志（key 为关键词，value:str 为所存储的日志）
 
-        self. save_dir = save_dir  # 保存的根目录
-        self.save_documents_path = os.path.join(save_dir, 'documents')  # 保存的文档路径
-        self.save_models_path = os.path.join(save_dir, 'models_trained')  # 保存的模型路径
-        self.save_results_path = os.path.join(save_dir, 'results')  # 保存的结果路径
+        self.save_dir = save_dir  # 保存的根目录
+        self.save_documents_path = os.path.join(save_dir, 'documents')  # 保存文档路径
+        self.save_models_path = os.path.join(save_dir, 'models_trained')  # 保存模型路径
+        self.save_results_path = os.path.join(save_dir, 'results')  # 保存结果路径
+        self.save_figures_path = os.path.join(save_dir, 'figures')  # 保存图片路径（Write）
+        self.sub_paths = [self.save_documents_path, self.save_models_path, self.save_results_path, self.save_figures_path]
 
+        # 删除文件夹
         if os.path.exists(save_dir) and is_delete:
             self._delete_dir()
-
-        if not os.path.exists(self.save_documents_path):
-            os.makedirs(self.save_documents_path)
-        if not os.path.exists(self.save_models_path):
-            os.makedirs(self.save_models_path)
-        if not os.path.exists(self.save_results_path):
-            os.makedirs(self.save_results_path)
+        # 创建文件夹
+        for path in self.sub_paths:
+            if not os.path.exists(path):
+                os.makedirs(path)
 
     def _delete_dir(self):
         """
-        删除 save_dir 文件夹。如果文件夹内存在文件的话，先验证是否存在 documents、models_trained、results 文件夹。
-        如果不同时存在这三个文件夹，则抛出 OSError 错误，因为您很有可能删除了错误的文件夹。
-        如果同时存在这三个文件夹，那么将会删除这三个文件夹内的所有文件（包括这三个文件夹）。
+        删除 save_dir 文件夹。如果文件夹内存在文件的话，先验证是否存在 documents、models_trained、results、figures 文件夹。
+        如果不同时存在这些文件夹，则抛出 OSError 错误，因为您很有可能删除了错误的文件夹。
+        如果同时存在这些文件夹，那么将会删除这四个文件夹内的所有文件（包括这四个文件夹）。
         最后，检查 self.save_dir 文件夹中是否有其他文件，如果有，则提示用户到资源管理器中核验，是否继续删除。
         """
-        # Step 1: 验证是否存在 documents、models_trained、results 文件夹
-        if not os.path.exists(self.save_documents_path) or not os.path.exists(self.save_models_path) or not os.path.exists(self.save_results_path):
-            raise OSError(f"您很有可能删除了错误的目录或该目录存在来自其他地方的文件，当前的根目录绝对路径为：{os.path.abspath(self.save_dir)}，请仔细检查！")
-        # Step 2: 删除这三个文件夹及其内部文件
-        for path in [self.save_documents_path, self.save_models_path, self.save_results_path]:
+        # Step 1: 验证是否存在 documents、models_trained、results、figures 文件夹
+        raise_info = f"您很有可能删除了错误的目录或该目录已经进行了修改。当前的根目录路径为：{self.save_dir}，请仔细检查！"
+        for path in self.sub_paths:
+            if not os.path.exists(path):
+                raise OSError(raise_info)
+
+        # Step 2: 删除这四个文件夹及其内部文件
+        for path in self.sub_paths:
             while True:
                 verify = input(f"您确定要删除 '{path}' 文件夹及其内部文件吗？删除将无法恢复，请谨慎选择！(y/n)")
                 if verify.lower() == 'y':
@@ -175,8 +196,8 @@ class Writer:
         :return: None
         """
         if key is None:
-            key = f"log_{self.data_key_index}"
-            self.data_key_index += 1
+            key = f"log_{self.log_key_index}"
+            self.log_key_index += 1
         if self.check_key(key, self.log):
             raise ValueError("数据名称不能与指标名称或者参数名称或者数据名称相同！")
         elif key not in self.log:
@@ -228,7 +249,7 @@ class Writer:
                 if save_mode == 'w+':
                     f.write(f"{current_time}\n{value}")
                 elif save_mode == 'a+':
-                    f.write(f"\n\n{current_time}\n{value}")
+                    f.write(f"\n\n\n[{current_time}]\n{value}")
         # 写入日志类文件
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for key, value in self.log.items():
@@ -236,4 +257,69 @@ class Writer:
                 if save_mode == 'w+':
                     f.write(f"{current_time}\n{value}")
                 elif save_mode == 'a+':
-                    f.write(f"\n\n{current_time}\n{value}")
+                    f.write(f"\n\n\n[{current_time}]\n{value}")
+
+    def draw(self, x, y=None, fmts=None, figsize=None, filename=None, show=True, **kwargs):
+        """
+        绘制图像
+        :param x: 1D 类型的序列数据，例如：list、tuple、ndarray等（要求有 __len__ 魔法方法）；该参数也可以省略，自动匹配长度。
+        :param y: 1D 或 2D 类型的序列数据，例如：list、tuple、ndarray等（要求有 __len__ 魔法方法）。
+        :param fmts: 图像的格式，例如：['b-', 'm--', 'g-.', 'r:']。
+        :param figsize: 图窗大小，例如：(7, 5)。
+        :param filename: 图片保存名称（带后缀）
+        :param show: 是否展示图像，默认为 True。
+        :param kwargs: 其他图窗相关参数。
+        :return: None
+        """
+        def use_svg_display():
+            """使用矢量图(SVG)打印图片"""
+            backend_inline.set_matplotlib_formats('svg')
+
+        # 更新默认配置
+        current_axes_set = deepcopy(self.init_axes_set)
+        current_axes_set.update(kwargs)
+        current_fmts = fmts if fmts is not None else self.fmts
+        current_figsize = figsize if figsize is not None else self.figsize
+        # 如果 y 是 None，则表示需要把 X 设置为 None，y 设置为纵坐标数据。
+        if y is None:
+            x, y = None, x
+        # 如果 y 是 1D 类型的序列数据，则将其转换为 2D 类型的序列数据。
+        if isinstance(y, (list, tuple)) and not isinstance(y[0], (list, tuple, np.ndarray)):
+            y = [y]
+        elif isinstance(y, np.ndarray) and len(y.shape) == 1:
+            y = y.reshape(1, -1)
+
+        # 创建画布和子图
+        use_svg_display()  # 使用svg格式的矢量图绘制图片
+        nrows, ncols = 1, 1
+        fig, axes = plt.subplots(nrows, ncols, figsize=current_figsize)
+        # 绘制图像
+        for i, seq in enumerate(y):
+            if x is None:
+                axes.plot(seq, current_fmts[i])
+            else:
+                axes.plot(x, seq, current_fmts[i])
+        # 设置图窗
+        for key, value in current_axes_set.items():
+            if key == "legend":
+                getattr(axes, f"{key}")(value, loc='upper right')
+            else:
+                getattr(axes, f"set_{key}")(value)
+        axes.grid()
+        # 展示图像 和 保存图像
+        if filename and show:
+            plt.savefig(os.path.join(self.save_figures_path, filename), dpi=None, facecolor='w', edgecolor='w')
+            plt.show()
+            cprint(f"绘制图像，图片已保存至 {os.path.join(self.save_figures_path, filename)}。", text_color="白色", end='\n')
+        elif filename and not show:
+            plt.savefig(os.path.join(self.save_figures_path, filename), dpi=None, facecolor='w', edgecolor='w')
+            plt.close()
+            cprint(f"未绘制图像，图片已保存至 {os.path.join(self.save_figures_path, filename)}", text_color="红色", end='\n')
+        elif not filename and show:
+            plt.show()
+            cprint("图像绘制完成，但未保存图像！", text_color="红色", end='\n')
+        elif not filename and not show:
+            plt.close()
+            cprint("未绘制图像，也未保存图像！", text_color="红色", end='\n')
+        else:
+            raise ValueError("出现未预知的错误！")
