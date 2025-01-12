@@ -1,0 +1,17 @@
+
+
+
+[2025-01-12 16:33:05]
+特征选择结果：['MaxPower', 'MinPower', 'StdDevPower', 'AvgRPow', 'Pitch', 'GenRPM', 'RotorRPM', 'GearOilTemp', 'GearBearTemp', 'GenPh1Temp', 'GenPh2Temp', 'GenPh3Temp', 'WindSpeed', 'StdDevWindSpeed', 'WindDirRel']。
+Persistence 模型训续和预测用时 1.16 秒。
+SVR 模型训续和预测用时 6.39 秒。
+Ridge 模型训续和预测用时 0.33 秒。
+RandomForestRegressor 模型训续和预测用时 32.52 秒。
+GradientBoostingRegressor 模型训续和预测用时 9.49 秒。
+AdaBoostRegressor 模型训续和预测用时 3.64 秒。
+BaggingRegressor 模型训续和预测用时 3.53 秒。
+RNNModel 模型训续和预测用时 390.64 秒。
+LSTMModel 模型训续和预测用时 392.37 秒。
+GRUModel 模型训续和预测用时 391.86 秒。
+TransformerWithLinear 模型训续和预测用时 469.91 秒。
+TransformerWithAttention 模型训续和预测用时 552.27 秒。

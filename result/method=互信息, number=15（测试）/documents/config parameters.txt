@@ -1,0 +1,43 @@
+
+
+
+[2025-01-12 16:33:05]
+project parameters
+	delete_dir:                    False
+	write_mode:                    a+
+	save_dir:                      ./result\method=互信息, number=15（测试）
+
+data parameters
+	time_step:                     10
+	feature_selection:             {'method': '互信息', 'number': 15}
+	target:                        Power
+	time_unknown_variables:        ['MaxPower', 'MinPower', 'StdDevPower', 'AvgRPow', 'Pitch', 'GenRPM', 'RotorRPM', 'NacelTemp', 'GearOilTemp', 'GearBearTemp', 'GenPh1Temp', 'GenPh2Temp', 'GenPh3Temp', 'GenBearTemp']
+	time_known_variables:          ['WindSpeed', 'StdDevWindSpeed', 'WindDirAbs', 'WindDirRel', 'EnvirTemp']
+	feature:                       ['MaxPower', 'MinPower', 'StdDevPower', 'AvgRPow', 'Pitch', 'GenRPM', 'RotorRPM', 'NacelTemp', 'GearOilTemp', 'GearBearTemp', 'GenPh1Temp', 'GenPh2Temp', 'GenPh3Temp', 'GenBearTemp', 'WindSpeed', 'StdDevWindSpeed', 'WindDirAbs', 'WindDirRel', 'EnvirTemp']
+	selected_feature:              ['MaxPower', 'MinPower', 'StdDevPower', 'AvgRPow', 'Pitch', 'GenRPM', 'RotorRPM', 'NacelTemp', 'GearOilTemp', 'GearBearTemp', 'GenPh1Temp', 'GenPh2Temp', 'GenPh3Temp', 'GenBearTemp', 'WindSpeed', 'StdDevWindSpeed', 'WindDirAbs', 'WindDirRel', 'EnvirTemp']
+	train_start_rate:              0.0
+	train_end_rate:                0.9
+	valid_start_rate:              0.9
+	valid_end_rate:                1.0
+	test_start_rate:               0.9
+	test_end_rate:                 1.0
+	is_features_history:           True
+	sample_gap:                    2
+	dataloader_shuffle:            True
+	train_batch_size:              64
+	eval_batch_size:               1024
+
+predictor parameters
+	Persistence:                   {}
+	SVR:                           {'kernel': 'rbf', 'C': 1.0, 'epsilon': 0.1, 'gamma': 'scale', 'degree': 3, 'coef0': 0.0, 'shrinking': True, 'tol': 0.001, 'cache_size': 200}
+	Ridge:                         {'alpha': 1.0, 'solver': 'auto', 'fit_intercept': True, 'max_iter': None, 'random_state': None, 'tol': 0.001}
+	RandomForestRegressor:         {'n_estimators': 100, 'max_depth': None, 'min_samples_split': 2, 'min_samples_leaf': 1, 'max_features': 'auto', 'bootstrap': True, 'random_state': None}
+	GradientBoostingRegressor:     {'loss': 'squared_error', 'learning_rate': 0.1, 'n_estimators': 100, 'subsample': 1.0, 'criterion': 'friedman_mse', 'random_state': None, 'max_depth': 3, 'min_samples_split': 2, 'min_samples_leaf': 1, 'max_features': None}
+	AdaBoostRegressor:             {'base_estimator': None, 'n_estimators': 50, 'learning_rate': 1.0, 'loss': 'linear', 'random_state': None}
+	BaggingRegressor:              {'base_estimator': None, 'n_estimators': 10, 'max_samples': 1.0, 'max_features': 1.0, 'bootstrap': True, 'bootstrap_features': False, 'oob_score': False, 'warm_start': False, 'n_jobs': None, 'random_state': None, 'verbose': 0}
+	RNNModel:                      {'hidden_size': 128, 'output_size': 1, 'num_layers': 2, 'bidirectional': False}
+	LSTMModel:                     {'hidden_size': 128, 'output_size': 1, 'num_layers': 2, 'bidirectional': False}
+	GRUModel:                      {'hidden_size': 128, 'output_size': 1, 'num_layers': 2, 'bidirectional': False}
+	TransformerWithLinear:         {'output_size': 1, 'encoder_model_dim': 128, 'encoder_head_num': 8, 'encoder_feedforward_dim': 2048, 'encoder_layer_num': 2, 'decoder_hidden_sizes': [1024, 256, 32], 'activation': 'relu', 'dropout': 0.1, 'max_length': 100}
+	TransformerWithAttention:      {'output_size': 1, 'encoder_model_dim': 128, 'encoder_head_num': 8, 'encoder_feedforward_dim': 2048, 'encoder_layer_num': 2, 'decoder_model_dim': 128, 'decoder_head_num': 8, 'decoder_feedforward_dim': 2048, 'decoder_layer_num': 2, 'activation': 'relu', 'dropout': 0.1, 'max_length': 100}
+	DL_train:                      {'epochs': 150, 'learning_rate': 0.001, 'clip_norm': None, 'ReduceLROnPlateau_factor': 0.5, 'ReduceLROnPlateau_patience': 10, 'ReduceLROnPlateau_threshold': 0.0001}
