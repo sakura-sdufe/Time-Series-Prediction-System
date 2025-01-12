@@ -2,24 +2,24 @@
 
 ## 项目介绍
 
-**该项目是一个支持机器学习和深度学习的多因素时间序列预测系统，旨在能够根据历史数据和可能影响时间序列的外部因素预测时间序列的未来值。**
+**该项目是一个支持机器学习和深度学习的多因素时间序列预测系统，旨在能够根据历史数据和可能影响时间序列的外部因素预测时间序列的未来值。** <br>
 
 ### 项目特点
 
 - 本项目提供了丰富的接口和简便的实现方法，特别是针对深度学习模型的构建，用户只需提供模型类就可以自动执行训练、评估、绘图、保存等功能。
-- 本项目已经内置了 sklearn 常用回归模型（SVR、Ridge、RandomForestRegressor、GradientBoostingRegressor、AdaBoostRegressor、BaggingRegressor）、循环神经网络系列模型（RNN、LSTM、GRU）和 Transformer系列模型（TransformerWithLinear、TransformerWithAttention）。用户可以提供自定义模型类，无需考虑训练、评估、展示、保存等繁杂工作，该项目可以自动实现以上功能**<u>（仅支持来自 sklearn 和 pytorch 的模型、仅支持未来一步的时间序列预测任务）</u>**。
+- 本项目已经内置了 sklearn 常用回归模型（SVR、Ridge、RandomForestRegressor、GradientBoostingRegressor、AdaBoostRegressor、BaggingRegressor）、循环神经网络系列模型（RNN、LSTM、GRU）和 Transformer系列模型（TransformerWithLinear、TransformerWithAttention）。用户可以提供自定义模型类，无需考虑训练、评估、展示、保存等繁杂工作，该项目可以自动实现以上功能（**仅支持来自 sklearn 和 pytorch 的模型、仅支持未来一步的时间序列预测任务**）。
 - 本项目用户可以自己决定是否输出信息到控制台、是否保存结果以及保存什么结果，具有较高的可拓展性和个性化设计。
 
 ### 环境要求
 
 本项目中的程序大部分都是基于第三方模块的基础功能，没有严格的版本要求，以下为测试环境仅供参考：
 
-Python >= 3.7
-numpy >= 1.21.5
-pandas >= 1.2.4
-matplotlib >= 3.5.3
-scikit-learn >= 1.0.2
-torch >= 1.7.0
+Python >= 3.7 <br>
+numpy >= 1.21.5 <br>
+pandas >= 1.2.4 <br>
+matplotlib >= 3.5.3 <br>
+scikit-learn >= 1.0.2 <br>
+torch >= 1.7.0 <br>
 
 ### 参数介绍
 
