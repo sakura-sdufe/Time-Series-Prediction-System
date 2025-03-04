@@ -43,8 +43,9 @@ def RMSE(true_value, predict_value):
 
 
 def sMAPE(true_value, predict_value):
+    epsilon = 1e-6  # 防止分母为0
     Numerator = np.abs(true_value - predict_value)
-    Denominator = (np.abs(true_value) + np.abs(predict_value)) / 2
+    Denominator = (np.abs(true_value) + np.abs(predict_value)) / 2 + epsilon
     return np.mean(Numerator / Denominator)
 
 
@@ -59,7 +60,7 @@ def calculate_metrics(true_value, predict_value, metrics=None):
     :return: 以字典的形式返回评价指标值。
     """
     if metrics is None:
-        metrics = ["sMAPE", "RMSE", "MAE", "R2"]
+        metrics = ["sMAPE", "MAPE", "RMSE", "MSE", "MAE", "R2"]
     true_value = _convert_to_numpy(true_value)
     predict_value = _convert_to_numpy(predict_value)
 
