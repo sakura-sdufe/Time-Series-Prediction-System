@@ -9,9 +9,3 @@
 # @Function : 
 -------------------------------------------------
 """
-
-from .min_max import MinMax
-from .norm import Norm
-
-
-__all__ = ['MinMax', 'Norm']

@@ -4,7 +4,7 @@
 # @Project  : Graduation-Project
 # @Time     : 2024/11/17 19:34
 # @Author   : 张浩
-# @FileName : data_convert.py
+# @FileName : predictor_ML.py
 # @Software : PyCharm
 # @Function : 
 -------------------------------------------------
@@ -21,7 +21,7 @@ def split_dataset(feature, target, start_position, end_position):
     :param target: 目标数据。数据类型为 DataFrame 或者 array。
     :param start_position: 切分的起始位置。如果是介于 0 和 1 之间的小数，则表示按照比例切分。如果是大于 1 的整数，则表示按照数量切分。
     :param end_position: 切分的结束位置。如果是介于 0 和 1 之间的小数，则表示按照比例切分。如果是大于 1 的整数，则表示按照数量切分。
-        Note: feature 和 targets 也可以接受其他可以被 len 函数调用和可以切片的数据类型。
+        Note: predict 和 targets 也可以接受其他可以被 len 函数调用和可以切片的数据类型。
             当 start_position 和 end_position 取值为 0.0 和 1.0 时，表示按照比例切分（输入为 float 类型数据按比例切分）；
             当 start_position 和 end_position 取值为 0 和 1 时，表示按照数量切分（输入为 int 类型数据按数量切分）。
     :return: feature_split, target_split 分别表示指定范围内的特征数据和目标数据。
@@ -31,7 +31,7 @@ def split_dataset(feature, target, start_position, end_position):
     assert start_position < end_position, "start_position 的取值必须小于 end_position！"
     if len(feature) != len(target):
         warnings.warn(
-            "start_position 和 end_position 在 dim=0 维度上长度不相同；如果你使用的时按比例划分，那么使用 feature 的长度。",
+            "start_position 和 end_position 在 dim=0 维度上长度不相同；如果你使用的时按比例划分，那么使用 predict 的长度。",
             category=UserWarning)
 
     if isinstance(start_position, float):  # 按照比例切分
@@ -54,15 +54,15 @@ def convert_feature(feature: pd.DataFrame, target: pd.Series, time_unknown_varia
     :param time_unknown_variables: 时变未知变量，接受 list 和 tuple 类型（内部的每个元素是字符串，表示 DataFrame 的列名）。
     :param time_known_variables: 时变已知变量，接受 list 和 tuple 类型（内部的每个元素是字符串，表示 DataFrame 的列名）。
     :param time_step: 使用前多少天的数据进行预测。
-    :param is_features_history: 是否使用 feature 中的历史数据作为特征，默认为 False。
+    :param is_features_history: 是否使用 predict 中的历史数据作为特征，默认为 False。
         如果使用特征历史数据，那么将会根据历史时间步为每个时变未知变量、时变已知变量、目标变量分别添加历史数据（其中时变未知变量将会创建
-        time_step 个列，时变已知变量将会创建 time_step+1 个列）；
+        num_predictors 个列，时变已知变量将会创建 num_predictors+1 个列）；
         如果不使用特征历史数据，那么只会添加最新观测的数据（时变已知变量用当前时间步表示，时变未知变量用上一时间步表示）。
 
     :return: 返回 DataFrame 类型处理后的时间序列特征数据，其中包含时变未知变量、时变已知变量、目标变量历史值。
 
     Note:
-        1. 如果 feature 中存在 time_unknown_variables 和 time_known_variables 未包含的变量，那么那些变量将不会加入到返回的时间序列特征中。
+        1. 如果 predict 中存在 time_unknown_variables 和 time_known_variables 未包含的变量，那么那些变量将不会加入到返回的时间序列特征中。
         2. 如果 is_features_history 为 True，那么返回的时间序列特征将会对列重新命名，列的命名格式为：'变量名_i' 表示前 i 天的数据，
             '变量名_0' 表示当前时间步的数据（这只会存在于时变已知变量中）。
         3. 该函数将会返回 DataFrame 类型数据，一般适用于时间序列模型和部分机器学习回归模型，并不适合循环神经网络模型。
@@ -70,7 +70,7 @@ def convert_feature(feature: pd.DataFrame, target: pd.Series, time_unknown_varia
     # Step 1.1：创建一个新的 DataFrame 用于存储时间序列特征数据
     time_series_feature = pd.DataFrame()
 
-    # Step 1.2：将 time_unknown_variables 和 time_known_variables 存在，但 feature 中不存在的变量删除。
+    # Step 1.2：将 time_unknown_variables 和 time_known_variables 存在，但 predict 中不存在的变量删除。
     time_unknown_variables = [col for col in time_unknown_variables if col in feature.columns]
     time_known_variables = [col for col in time_known_variables if col in feature.columns]
 
@@ -83,7 +83,7 @@ def convert_feature(feature: pd.DataFrame, target: pd.Series, time_unknown_varia
             feature_unknown = pd.concat([feature_unknown, feature_shift], axis=1)
     else:
         feature_unknown = feature[time_unknown_variables].shift(1)
-    feature_unknown = feature_unknown[time_step:]  # 去掉前 time_step 行（对齐）
+    feature_unknown = feature_unknown[time_step:]  # 去掉前 num_predictors 行（对齐）
     feature_unknown.reset_index(drop=True, inplace=True)
     time_series_feature = pd.concat([time_series_feature, feature_unknown], axis=1)
 
@@ -96,7 +96,7 @@ def convert_feature(feature: pd.DataFrame, target: pd.Series, time_unknown_varia
             feature_known = pd.concat([feature_known, feature_shift], axis=1)
     else:
         feature_known = feature[time_known_variables]
-    feature_known = feature_known[time_step:]  # 去掉前 time_step 行（对齐）
+    feature_known = feature_known[time_step:]  # 去掉前 num_predictors 行（对齐）
     feature_known.reset_index(drop=True, inplace=True)
     time_series_feature = pd.concat([time_series_feature, feature_known], axis=1)
 
@@ -104,18 +104,18 @@ def convert_feature(feature: pd.DataFrame, target: pd.Series, time_unknown_varia
     for i in range(1, time_step+1):
         target_shift = target.shift(i)
         target_shift.name = f"{target.name}_{i}"
-        target_shift = target_shift[time_step:]  # 去掉前 time_step 行（这些行包括 NaN 值）
+        target_shift = target_shift[time_step:]  # 去掉前 num_predictors 行（这些行包括 NaN 值）
         target_shift.reset_index(drop=True, inplace=True)
         time_series_feature = pd.concat([time_series_feature, target_shift], axis=1)
 
     # Step 5：处理目标
-    time_series_target = target[time_step:]  # 去掉前 time_step 行（对齐）
+    time_series_target = target[time_step:]  # 去掉前 num_predictors 行（对齐）
 
     assert len(time_series_feature) == len(time_series_target), "特征数据和目标数据的长度不一致。【请检查该函数内部】"
     return time_series_feature, time_series_target
 
 
-class DataSplit:
+class SeqSplit:
     def __init__(self, time_feature: pd.DataFrame, time_target: pd.Series, parameters_data, normalization=None):
         """
         为时间序列数据添加历史特征，分割数据集，标准化数据集，转化成 ndarray 数据集。

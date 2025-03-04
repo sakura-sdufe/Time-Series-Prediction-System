@@ -10,14 +10,12 @@
 -------------------------------------------------
 """
 
-import copy
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.nn import ModuleList
 from typing import Sequence
 
-from .Base import ModelBase
+from Base.Base import ModelBase, RepeatLayer, get_activation_fn
 
 
 class PositionalEncoding(nn.Module):
@@ -29,7 +27,7 @@ class PositionalEncoding(nn.Module):
             max_length: 最大长度，默认值为 1000。
             dtype: 数据类型，默认值为 torch.float32。
         Note:
-            位置编码矩阵的维度为 [1, max_length, model_dim] == [batch_size, time_step, model_dim]。
+            位置编码矩阵的维度为 [1, max_length, model_dim] == [batch_size, num_predictors, model_dim]。
         """
         super(PositionalEncoding, self).__init__()
         self.model_dim = model_dim
@@ -58,14 +56,14 @@ class PositionalEncoding(nn.Module):
         """
         前向传播
         Args:
-            X: 输入张量，维度为 [time_step, batch_size, model_dim]。
+            X: 输入张量，维度为 [num_predictors, batch_size, model_dim]。
         Returns:
-            位置编码后的张量，维度为 [time_step, batch_size, model_dim]。
+            位置编码后的张量，维度为 [num_predictors, batch_size, model_dim]。
         """
-        X = X.permute(1, 0, 2)  # 转置，维度变为 [batch_size, time_step, model_dim]
+        X = X.permute(1, 0, 2)  # 转置，维度变为 [batch_size, num_predictors, model_dim]
         assert X.size(-1) == self.positional_encoding.size(-1), "输入维度和位置编码维度必须匹配"
         positional_result = X + self.positional_encoding[:, 0:X.size(1), :]
-        return positional_result.permute(1, 0, 2)  # 转置，维度变为 [time_step, batch_size, model_dim]
+        return positional_result.permute(1, 0, 2)  # 转置，维度变为 [num_predictors, batch_size, model_dim]
 
 
 class AttentionLinearLayer(nn.Module):
@@ -88,13 +86,13 @@ class AttentionLinearLayer(nn.Module):
         self.norm2 = nn.LayerNorm(d_model)
 
         self.dropout = nn.Dropout(dropout)
-        self.activation = _get_activation_fn(activation)
+        self.activation = get_activation_fn(activation)
 
     def forward(self, src):
         """
         前向传播
-        :param src: 输入张量，维度为 [time_step, batch_size, d_model]
-        :return: 输出张量，维度为 [time_step, batch_size, d_model]
+        :param src: 输入张量，维度为 [num_predictors, batch_size, d_model]
+        :return: 输出张量，维度为 [num_predictors, batch_size, d_model]
         """
         # MultiheadAttention
         attn_output, _ = self.self_attn(src, src, src)
@@ -106,24 +104,6 @@ class AttentionLinearLayer(nn.Module):
         src = src + linear_output
         src = self.norm2(src)
         return src
-
-
-class Decoder(nn.Module):
-    def __init__(self, decoder_layer, num_layers):
-        """
-        将多个 DecoderLayer 层堆叠在一起。
-        :param decoder_layer: DecoderLayer 层。
-        :param num_layers: DecoderLayer 层数。
-        """
-        super(Decoder, self).__init__()
-        self.layers = _get_clones(decoder_layer, num_layers)
-        self.num_layers = num_layers
-
-    def forward(self, src):
-        output = src
-        for sublayer in self.layers:
-            output = sublayer(output)
-        return output
 
 
 class TransformerWithLinear(ModelBase):
@@ -165,13 +145,13 @@ class TransformerWithLinear(ModelBase):
         self.decoder = ModuleList(decoder_layers)
         self.output_projection = nn.Linear(previous_size, output_size)
 
-        self.activation = _get_activation_fn(activation)
+        self.activation = get_activation_fn(activation)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, X):
         """
         前向传播
-        :param X: 输入张量，维度为 [time_step, batch_size, input_size]
+        :param X: 输入张量，维度为 [num_predictors, batch_size, input_size]
         :return: 输出张量，维度为 [batch_size, outputs_node]
         """
         X = self.input_projection(X)  # 输入映射
@@ -222,14 +202,14 @@ class TransformerWithAttention(ModelBase):
             d_model=decoder_model_dim, nhead=decoder_head_num, dim_feedforward=decoder_feedforward_dim,
             dropout=dropout, activation=activation
         )
-        self.decoder = Decoder(decoder_layer, decoder_layer_num)
+        self.decoder = RepeatLayer(decoder_layer, decoder_layer_num)
         # 解码器 -> 输出
         self.output_project = nn.Linear(decoder_model_dim, output_size)
 
     def forward(self, X):
         """
         前向传播
-        :param X: 输入张量，维度为 [time_step, batch_size, input_size]
+        :param X: 输入张量，维度为 [num_predictors, batch_size, input_size]
         :return: 输出张量，维度为 [batch_size, output_size]
         """
         X = self.input_project(X)
@@ -240,14 +220,3 @@ class TransformerWithAttention(ModelBase):
         Y = X[-1, :, :]
         Y = self.output_project(Y)
         return Y
-
-
-def _get_activation_fn(activation):
-    if activation == "relu":
-        return F.relu
-    elif activation == "gelu":
-        return F.gelu
-
-
-def _get_clones(module, N):
-    return ModuleList([copy.deepcopy(module) for i in range(N)])

@@ -11,21 +11,31 @@
 """
 
 import os
-from data.data_parameters import DataParameters
+import datetime
 
 
 class ProjectParameters:
     def __init__(self):
         # 保存设置
-        self.delete_dir = False  # 是否删除 Writer 类生成的目录。（该参数仅在 Windows 系统上测试）
-        self.write_mode = 'a+'  # Writer 类写入本地模式，可选 'w+' 和 'a+'，默认为 'w+'。
-        parameters_data = DataParameters()  # 获取 DataSplit 模块的超参数
+        self.dataset_name = 'VestasV52'
+        self.delete_dir = True  # 是否删除 Writer 类生成的目录。（该参数仅在 Windows 系统上测试）
+        self.save_mode = 'a+'  # Writer 类写入本地模式，可选 'w+' 和 'a+'，默认为 'w+'。默认为 'a+'，
 
         # 数据基础信息
-        self.save_dir = os.path.join(
-            r'./result', ', '.join([f"{k}={v}" for k, v in parameters_data['feature_selection'].items()])
+        now = datetime.datetime.now()
+        formatted_time = now.strftime("%Y-%m-%d")
+        self.save_predictor_dir = os.path.join(
+            r'./result',
+            f"{self.dataset_name} [Predictor] (time=2025-02-27)"
         )
-        # self.save_dir = r'./result/测试'  # 模型保存路径
+        # self.save_predictor_dir = os.path.join(
+        #     r'./result',
+        #     f"{self.dataset_name} [Predictor] (time={formatted_time})"
+        # )
+        self.save_ensemble_dir = os.path.join(
+            r'./result',
+            f"{self.dataset_name} [Ensemble] (time={formatted_time})"
+        )
 
     def __getitem__(self, item):
         return getattr(self, item)

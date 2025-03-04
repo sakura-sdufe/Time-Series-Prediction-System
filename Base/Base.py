@@ -11,10 +11,13 @@
 """
 
 import os
+import copy
 import time
+import warnings
 import pandas as pd
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from utils.Animator import Animator
 from utils.device_gpu import try_gpu
@@ -23,7 +26,7 @@ from utils.device_gpu import try_gpu
 def evaluate_DL(model, dataloader, monitors, device):
     """
     评估深度学习模型
-    :param model: 需要评估的深度学习模型。需要有 model.predict() 方法。
+    :param model: 需要评估的深度学习模型。需要有 predict.predict() 方法。
     :param dataloader: DataLoader 数据加载器。需要有 dataloader.dataset.targets 属性
     :param monitors: Union[List|Tuple] 监控器指标函数，用于监测预测任务的表现，监控器函数 reduction 应当为 'mean'。
     :param device: 运算设备
@@ -42,10 +45,10 @@ def evaluate_DL(model, dataloader, monitors, device):
 def train_DL(model, train_trainer, train_evaler, valid_evaler, *, epochs, criterion, optimizer, scheduler, monitor,
              clip_norm=None, device=None, best_model_dir=None, loss_figure_path=None, monitor_figure_path=None,
              loss_result_path=None, monitor_result_path=None, lr_sec_path=None, monitor_name="Monitor", loss_title="Loss",
-             monitor_title=None, loss_yscale="linear", monitor_yscale="linear"):
+             monitor_title=None, loss_yscale="linear", monitor_yscale="linear", train_back=True):
     """
     训练深度学习模型
-    :param model: 需要训练的深度学习模型，需要有 model.train_epoch() 方法。
+    :param model: 需要训练的深度学习模型，需要有 predict.train_epoch() 方法。
     :param train_trainer: 训练集 DataLoader 数据加载器（用于训练）。
     :param train_evaler: 训练集 DataLoader 数据加载器（用于评估）。
     :param valid_evaler: 验证集 DataLoader 数据加载器。
@@ -60,14 +63,15 @@ def train_DL(model, train_trainer, train_evaler, valid_evaler, *, epochs, criter
     :param best_model_dir: 最佳模型保存目录，保存整个模型。默认为 None，即不保存模型。
     :param loss_figure_path: 损失函数图像保存路径。默认为 None，即不保存损失函数图像。
     :param monitor_figure_path: 监控器指标图像保存路径。默认为 None，即不保存监控器指标图像。
-    :param loss_result_path: 损失函数结果保存路径。默认为 None，即不保存损失函数结果。
-    :param monitor_result_path: 监控器指标结果保存路径。默认为 None，即不保存监控器指标结果。
-    :param lr_sec_path: 学习率与每秒样本数结果保存路径。默认为 None，即不保存学习率与每秒样本数结果。
+    :param loss_result_path: 损失函数结果保存路径。默认为 None，即不保存损失函数结果。后缀名为 .csv
+    :param monitor_result_path: 监控器指标结果保存路径。默认为 None，即不保存监控器指标结果。后缀名为 .csv
+    :param lr_sec_path: 学习率与每秒样本数结果保存路径。默认为 None，即不保存学习率与每秒样本数结果。后缀名为 .csv
     :param monitor_name: 监控器指标名称。默认为 "Monitor"。
     :param loss_title: 损失函数绘图标题。默认为 "Loss"。
     :param monitor_title: 监控器指标绘图标题。默认为 None，表示使用 monitor_name。
     :param loss_yscale: 损失函数绘图 Y 轴刻度。默认为 "linear"。
     :param monitor_yscale: 监控器指标绘图 Y 轴刻度。默认为 "linear"。
+    :param train_back: 是否在训练过程中，如果学习率发生变化，是否读取之前的最优模型，在最优模型上继续训练。默认为 True。
     :return: best_monitor, run_time, best_model_path
         best_monitor: 最佳监控器指标值
         run_time: 总运行时间
@@ -86,6 +90,7 @@ def train_DL(model, train_trainer, train_evaler, valid_evaler, *, epochs, criter
                                  xlim=[0, epochs], yscale=monitor_yscale)
     best_monitor = float('inf')  # 初始化最佳监控器指标值
     best_model_filename = None  # 初始化最佳模型文件名
+    current_lr = optimizer.param_groups[0]['lr']  # 初始化当前学习率
 
     for epoch in range(epochs):
         epoch_start_time = time.perf_counter()
@@ -97,11 +102,18 @@ def train_DL(model, train_trainer, train_evaler, valid_evaler, *, epochs, criter
         train_loss, train_monitor = train_evaluate_result
         valid_loss, valid_monitor = valid_evaluate_result
         scheduler.step(valid_monitor)  # 更新学习率并监测验证集上的性能
+        if train_back and current_lr != optimizer.param_groups[0]['lr']:  # 如果学习率发生变化，读取之前的最优模型，在最优模型上继续训练
+            try:
+                model.load_state_dict(torch.load(os.path.join(best_model_dir, best_model_filename)).state_dict())
+                print("\n" + "-"*100 + "\n学习率发生变化，读取之前的最优模型，在最优模型上继续训练。\n" + "-"*100 + "\n")
+            except Exception:
+                warnings.warn(f"读取最优模型失败，将使用学习率更新前的上一个状态继续训练。")
         print(f"epoch：{epoch+1}，学习率：{optimizer.param_groups[0]['lr']}，每秒样本数：{sample_sec:.2f}；\n",
               f"\t\t训练集损失值：{train_loss:.5f}，训练集监测值：{train_monitor:.5f}；\n",
-              f"\t\t验证集损失值：{valid_loss:.5f}，验证集监测值：{valid_monitor:.5f}。\n", sep='')
+              f"\t\t验证集损失值：{valid_loss:.5f}，验证集监测值：{valid_monitor:.5f}，最佳验证集监测值：{best_monitor:.5f}。\n",
+              sep='')
         loss_result.append([train_loss, valid_loss])  # 保存损失函数结果
-        monitor_result.append([train_monitor, valid_monitor])  # 保存监控器函数结果
+        monitor_result.append([train_monitor, valid_monitor, best_monitor])  # 保存监控器函数结果
         lr_sec_result.append([optimizer.param_groups[0]['lr'], sample_sec])  # 保存学习率与每秒样本数结果
         if valid_monitor < best_monitor:  # 保存最佳模型
             best_monitor = valid_monitor
@@ -115,11 +127,17 @@ def train_DL(model, train_trainer, train_evaler, valid_evaler, *, epochs, criter
     torch.save(model, os.path.join(best_model_dir, f'epoch={epochs}, final.pth')) if best_model_dir else None
 
     if loss_result_path:
-        pd.DataFrame(loss_result, columns=['train', 'valid'], index=range(1, len(loss_result)+1)).to_csv(loss_result_path)
+        pd.DataFrame(
+            loss_result, columns=['train', 'valid'], index=range(1, len(loss_result)+1)
+        ).to_csv(loss_result_path)
     if monitor_result_path:
-        pd.DataFrame(monitor_result, columns=['train', 'valid'], index=range(1, len(monitor_result)+1)).to_csv(monitor_result_path)
+        pd.DataFrame(
+            monitor_result, columns=['train', 'valid', 'best(valid)'], index=range(1, len(monitor_result)+1)
+        ).to_csv(monitor_result_path)
     if lr_sec_path:
-        pd.DataFrame(lr_sec_result, columns=['lr', 'sample/sec'], index=range(1, len(lr_sec_result)+1)).to_csv(lr_sec_path)
+        pd.DataFrame(
+            lr_sec_result, columns=['lr', 'sample/sec'], index=range(1, len(lr_sec_result)+1)
+        ).to_csv(lr_sec_path)
     best_model_path = os.path.join(best_model_dir, best_model_filename) if best_model_dir else None  # 最佳模型保存路径
     run_time = time.perf_counter() - start_time
     print(f"训练结束，最佳模型监控器指标值为：{best_monitor:.5f}，总运行时间：{run_time:.2f}秒。")
@@ -132,10 +150,13 @@ class ModelBase(nn.Module):
         定义深度学习模型的基模型。需要重写 __init__ 和 forward 方法。
         若子类中 forward 方法不满足标记的条件，那么需要重写 train_epoch 和 predict 方法。
         note:
-            1. DataLoader类型数据满足 X 的维度：[batch_size, steps, inputs_size]，Y的维度：[batch_size]。
+            1. DataLoader类型数据满足 X 的维度：[batch_size, steps, input_size]，Y的维度：[batch_size]。
             2. _trainer 表示用于训练的 DataLoader 数据加载器，_evaler 表示用于评估的 DataLoader 数据加载器。主要差异是：
-                _trainer 中的 shuffle=True 和 batch_size=train_batch_size；
+                _trainer 中的 shuffle=True 和 batch_size=predictor_batch_size；
                 _evaler 中的 shuffle=False 和 batch_size=eval_batch_size。
+            3. input_size 和 time_step 参数会自动解析为输入特征的维度和时间步数。
+                input_size 是定义模型必须参数，但是模型参数无需指定。time_step 根据模型需求选择是否引入。
+                input_size 为必须参数，即使没有使用也需要在模型中定义。
         """
         super(ModelBase, self).__init__()
 
@@ -144,13 +165,13 @@ class ModelBase(nn.Module):
         深度学习模型向前计算，需要在子类中重写。
         note:
             1. 输入应当是一个 Tensor，且维度应为：[time_step, batch_size, input_size]；
-            2. 输出应当是一个 Tensor，且维度应为：[batch_size, outputs_node]。
+            2. 输出应当是一个 Tensor，且维度应为：[batch_size, output_size]。
         """
         raise NotImplementedError
 
     def train_epoch(self, dataloader, criterion, optimizer, device=None, clip_norm=None):
         """
-        训练 RNNs 系列模型一个迭代周期
+        深度学习模型训练过程中一个迭代周期
         :param dataloader: DataLoader 数据加载器。
         :param criterion: 损失函数
         :param optimizer: 优化器
@@ -197,9 +218,30 @@ class ModelBase(nn.Module):
         print('<-' + '-' * 50)
         # <-- 用于训练的训练集指标计算（用户可自行选择是否输出）
 
+    def predict(self, dataloader, device=None):
+        """
+        预测深度学习模型
+        :param dataloader: DataLoader 数据加载器。
+        :param device: 运算设备。默认为 None，如果有 GPU 则使用 GPU 进行运算，否则使用 CPU 进行运算。
+        :return: 预测结果。维度为：torch.Size([batch_size, output_size])
+        """
+        if device is None:
+            device = try_gpu()
+        self.to_device(device)
+        self.eval()
+        predict_list = []
+        with torch.no_grad():
+            for X, Y in dataloader:
+                X, Y = X.to(device), Y.to(device)
+                X = X.permute(1, 0, 2)  # 将输入张量的维度调整为：[time_step, batch_size, input_size]
+                Y_hat = self(X)
+                predict_list.append(Y_hat.cpu())
+        predict_result = torch.cat(predict_list, dim=0)
+        return predict_result
+
     def fit(self, train_trainer, train_evaler, valid_evaler, epochs, criterion, optimizer, scheduler, monitor, **kwargs):
         """
-        训练 RNNs 系列模型
+        训练深度学习模型
         :param train_trainer: 训练集 DataLoader 数据加载器（用于训练）。
         :param train_evaler: 训练集 DataLoader 数据加载器（用于评估）。
         :param valid_evaler: 验证集 DataLoader 数据加载器。
@@ -219,30 +261,9 @@ class ModelBase(nn.Module):
             self.load_state_dict(best_model.state_dict())  # 加载最佳模型参数
         return best_monitor, run_time
 
-    def predict(self, dataloader, device=None):
-        """
-        预测 RNNs 系列模型
-        :param dataloader: DataLoader 数据加载器。
-        :param device: 运算设备。默认为 None，如果有 GPU 则使用 GPU 进行运算，否则使用 CPU 进行运算。
-        :return: 预测结果。维度为：torch.Size([batch_size, outputs_node])
-        """
-        if device is None:
-            device = try_gpu()
-        self.to_device(device)
-        self.eval()
-        predict_list = []
-        with torch.no_grad():
-            for X, Y in dataloader:
-                X, Y = X.to(device), Y.to(device)
-                X = X.permute(1, 0, 2)  # 将输入张量的维度调整为：[time_step, batch_size, input_size]
-                Y_hat = self(X)
-                predict_list.append(Y_hat.cpu())
-        predict_result = torch.cat(predict_list, dim=0)
-        return predict_result
-
     def evaluate(self, dataloader, monitors, device=None):
         """
-        评估 RNNs 系列模型
+        评估深度学习模型
         :param dataloader: DataLoader 数据加载器。需要有 dataloader.dataset.targets 属性。
         :param monitors: Union[List|Tuple] 监控器指标函数，用于监测预测任务的表现，监控器函数 reduction 应当为 'mean'。
         :param device: 运算设备。默认为 None，如果有 GPU 则使用 GPU 进行运算，否则使用 CPU 进行运算。
@@ -262,3 +283,43 @@ class ModelBase(nn.Module):
     def save(self, model_path):
         """保存模型"""
         torch.save(self, model_path)
+
+
+class RepeatLayer(nn.Module):
+    def __init__(self, layer, num_layers):
+        """
+        将多个 layer 层堆叠在一起。
+        :param layer: torch.nn 模块支持的层或者模块（可以直接调用）。
+        :param num_layers: layer 重复层数。
+        """
+        super(RepeatLayer, self).__init__()
+        self.layers = get_clones(layer, num_layers)
+        self.num_layers = num_layers
+
+    def forward(self, X):
+        output = X
+        for sublayer in self.layers:
+            output = sublayer(output)
+        return output
+
+
+def get_activation_fn(activation):
+    if activation == "relu":
+        return F.relu
+    elif activation == "gelu":
+        return F.gelu
+    elif activation == 'silu':
+        return F.silu
+
+
+def get_activation_nn(activation):
+    if activation == "relu":
+        return nn.ReLU()
+    elif activation == "gelu":
+        return nn.GELU()
+    elif activation == 'silu':
+        return nn.SiLU()
+
+
+def get_clones(module, N):
+    return nn.ModuleList([copy.deepcopy(module) for i in range(N)])

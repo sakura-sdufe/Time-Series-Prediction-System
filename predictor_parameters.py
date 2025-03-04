@@ -12,7 +12,10 @@
 
 class PredictorParameters:
     def __init__(self):
-        """类内变量名需与模型类名保持一致，否则无法正常解析。"""
+        """
+        1. 类内变量名需与模型类名保持一致，否则无法正常解析。
+        2. 深度学习模型参数无需传入 input_size 和 time_step，会自动解析。
+        """
         # Persistence 模型参数
         self.Persistence = {}
         # SVR 模型参数
@@ -42,7 +45,7 @@ class PredictorParameters:
             'max_depth': None,  # 决策树的最大深度，默认为 None。
             'min_samples_split': 2,  # 内部节点再划分所需最小样本数，默认为 2。
             'min_samples_leaf': 1,  # 叶子节点最少样本数，默认为 1。
-            'max_features': 'auto',  # 寻找最佳分割时的特征数，默认为 'auto'。
+            'max_features': 1.0,  # 在寻找最佳分割时需要考虑的特征数量，默认为 1.0。
             'bootstrap': True,  # 是否使用自助法，默认为 True。
             'random_state': None,  # 随机种子，默认为 None。
         }
@@ -63,7 +66,7 @@ class PredictorParameters:
         }
         # AdaBoostRegressor 模型参数
         self.AdaBoostRegressor = {
-            'base_estimator': None,  # 基本估计器，默认为 None。
+            'estimator': None,  # 基本估计器，默认为 None。
             'n_estimators': 50,  # 决策树的数量（等于弱学习器的最大迭代次数），默认为 50。
             'learning_rate': 1.0,  # 学习率，默认为 1.0。
             'loss': 'linear',  # 损失函数，默认为 'linear'。
@@ -71,7 +74,7 @@ class PredictorParameters:
         }
         # BaggingRegressor 模型参数
         self.BaggingRegressor = {
-            'base_estimator': None,  # 基础学习器。如果为 None，则默认使用 DecisionTreeRegressor。默认为 None。
+            'estimator': None,  # 基础学习器。如果为 None，则默认使用 DecisionTreeRegressor。默认为 None。
             'n_estimators': 10,  # 集成中基学习器的数量。数量越多，效果可能越好，但计算成本更高。默认为 10。
             'max_samples': 1.0,  # 每个基学习器训练时使用样本的比例或数量。如果为浮点数（如 0.8），表示比例；整数表示样本数。默认为 1.0。
             'max_features': 1.0,  # 每个基学习器使用特征的比例或数量。类似于 max_samples，支持浮点数和整数。默认为 1.0。
@@ -85,34 +88,41 @@ class PredictorParameters:
         }
         # RNN 模型参数
         self.RNNModel = {
-            'hidden_size': 128,  # 隐藏层节点数，默认为 128。
+            'hidden_size': 512,  # 隐藏层节点数，默认为 128。
             'output_size': 1,  # 输出层节点数，默认为 1。
-            'num_layers': 2,  # 网络层数，默认为 2。
+            'num_layers': 4,  # 网络层数，默认为 2。
             'bidirectional': False,  # 是否使用双向RNN，默认为 False。
         }
         # LSTM 模型参数
         self.LSTMModel = {
-            'hidden_size': 128,  # 隐藏层节点数，默认为 128。
+            'hidden_size': 512,  # 隐藏层节点数，默认为 128。
             'output_size': 1,  # 输出层节点数，默认为 1。
-            'num_layers': 2,  # 网络层数，默认为 2。
+            'num_layers': 4,  # 网络层数，默认为 2。
             'bidirectional': False,  # 是否使用双向RNN，默认为 False。
         }
         # GRU 模型参数
         self.GRUModel = {
-            'hidden_size': 128,  # 隐藏层节点数，默认为 128。
+            'hidden_size': 512,  # 隐藏层节点数，默认为 128。
             'output_size': 1,  # 输出层节点数，默认为 1。
-            'num_layers': 2,  # 网络层数，默认为 2。
+            'num_layers': 4,  # 网络层数，默认为 2。
             'bidirectional': False,  # 是否使用双向RNN，默认为 False。
+        }
+        # MLP 模型参数
+        self.MLPModel = {
+            'output_size': 1,  # 输出层节点数，默认为 1。
+            'hidden_sizes': [128, 512, 0, 2048, 4096, 0, 512, 128, 0, 32, 8, 0],  # 隐藏层维度列表，默认为 None，表示直接映射到输出维度。
+            'activation': 'relu',  # 激活函数，默认为 'relu'。可选值为 'relu'、'gelu'。
+            'dropout': 0.0  # dropout 概率，默认为 0.1。
         }
         # TransformerWithLinear 模型参数
         self.TransformerWithLinear = {
             'output_size': 1,  # 输出层节点数，默认为 1。
             'encoder_model_dim': 128,  # 编码器 TransformerEncoderLayer 模型维度，默认为 128。
             'encoder_head_num': 8,  # 编码器 TransformerEncoderLayer 多头注意力机制的头数，默认为 8。
-            'encoder_feedforward_dim': 2048,  # 编码器 TransformerEncoderLayer 前馈神经网络的隐藏层维度，默认为 2048。
+            'encoder_feedforward_dim': 512,  # 编码器 TransformerEncoderLayer 前馈神经网络的隐藏层维度，默认为 2048。
             'encoder_layer_num': 2,  # 编码器 TransformerEncoderLayer 层数，默认为 2。
-            'decoder_hidden_sizes': [1024, 256, 32],  # 解码器全连接层的隐藏层维度列表，默认为 None，表示直接映射到输出维度。
-            'activation': 'relu',  # 编码器和解码器的激活函数，默认为 'relu'。
+            'decoder_hidden_sizes': [512, 256, 32],  # 解码器全连接层的隐藏层维度列表，默认为 None，表示直接映射到输出维度。
+            'activation': 'relu',  # 编码器和解码器的激活函数，默认为 'relu'。可选值为 'relu'、'gelu'。
             'dropout': 0.1,  # 编码器 TransformerEncoderLayer 和 解码器全连接层的 dropout 概率，默认为 0.1。
             'max_length': 100,  # 位置编码的最大长度，默认为 1000。主要用于位置编码。注：该参数值必须要大于时间步。
         }
@@ -121,22 +131,24 @@ class PredictorParameters:
             'output_size': 1,  # 输出层节点数，默认为 1。
             'encoder_model_dim': 128,  # 编码器 TransformerEncoderLayer 模型维度，默认为 128。
             'encoder_head_num': 8,  # 编码器 TransformerEncoderLayer 多头注意力机制的头数，默认为 8。
-            'encoder_feedforward_dim': 2048,  # 编码器 TransformerEncoderLayer 前馈神经网络的隐藏层维度，默认为 2048。
+            'encoder_feedforward_dim': 512,  # 编码器 TransformerEncoderLayer 前馈神经网络的隐藏层维度，默认为 2048。
             'encoder_layer_num': 2,  # 编码器 TransformerEncoderLayer 层数，默认为 2。
             'decoder_model_dim': 128,  # 解码器 MultiHeadAttention 模型维度，默认值为 128。
             'decoder_head_num': 8,  # 解码器 MultiHeadAttention 多头注意力机制的头数，默认值为 8。
-            'decoder_feedforward_dim': 2048,  # 解码器 MultiHeadAttention 前馈神经网络的隐藏层维度，默认值为 2048。
+            'decoder_feedforward_dim': 512,  # 解码器 MultiHeadAttention 前馈神经网络的隐藏层维度，默认值为 2048。
             'decoder_layer_num': 2,  # 解码器 MultiHeadAttention 层数，默认值为 2。
-            'activation': 'relu',  # 编码器和解码器的激活函数，默认为 'relu'。
+            'activation': 'relu',  # 编码器和解码器的激活函数，默认为 'relu'。可选值为 'relu'、'gelu'。
             'dropout': 0.1,  # 编码器 TransformerEncoderLayer 和 解码器 MultiHeadAttention 的 dropout 概率，默认为 0.1。
             'max_length': 100,  # 位置编码的最大长度，默认为 1000。主要用于位置编码。注：该参数值必须要大于时间步。
         }
+        # 深度学习训练参数
         self.DL_train = {
-            'epochs': 150,  # 训练轮数，默认为 150。
+            'epochs': 300,  # 训练轮数，默认为 300。
             'learning_rate': 1e-3,  # 学习率，默认为 1e-3。
-            'clip_norm': None,  # 梯度裁剪阈值，默认为 None，表示不裁剪。
+            'weight_decay': 1e-4,  # 权重衰减，默认为 1e-4。
+            'clip_norm': 0.5,  # 梯度裁剪阈值，默认为 None，表示不裁剪。
             'ReduceLROnPlateau_factor': 0.5,  # 学习率衰减因子，默认为 0.5。
-            'ReduceLROnPlateau_patience': 10,  # 监测器函数不再减小的累计次数，默认为 10。
+            'ReduceLROnPlateau_patience': 15,  # 监测器函数不再减小的累计次数，默认为 10。
             'ReduceLROnPlateau_threshold': 1e-4,  # 只关注超过阈值的显著变化，默认为 1e-4。
         }
 

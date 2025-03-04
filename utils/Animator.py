@@ -11,9 +11,16 @@
 -------------------------------------------------
 """
 
+import matplotlib
+from matplotlib import rcParams
 from matplotlib import pyplot as plt
 from matplotlib_inline import backend_inline  # 设置图片以SVG格式显示
 from IPython import display
+
+matplotlib.use("TkAgg")
+# 设置中文字体为 SimHei（黑体）
+rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+rcParams['axes.unicode_minus'] = False   # 用来正常显示负号
 
 
 def use_svg_display():
@@ -121,18 +128,18 @@ class Animator:
             self.fig.savefig(figure_path, dpi=None, facecolor='w', edgecolor='w')
         # 在PyCharm中生成图片，并且block program
         # print("图像绘制完成，请查看图像，并且手动结束program block！")
-        # plt.show()
+        plt.show(block=False)
 
 
 if __name__ == "__main__":
     # 设置训练动态图
     loss_animator = Animator(xlabel='epoch', ylabel='loss', legend=['train loss', 'valid loss'], title="Model",
-                             xlim=[0, 10])
+                             xlim=[0, 5])
     acc_animator = Animator(xlabel='epoch', ylabel='accuracy', legend=['train acc', 'valid acc'], title="Model",
-                            xlim=[0, 10])
+                            xlim=[0, 5])
     for i in range(5):
         loss_animator.add(i, [i+1, -i+1])
         acc_animator.add(i, [i+2, -i+2])
     # 保存绘制的图片。先保存再做展示。
-    loss_animator.show("../test loss.png")
-    acc_animator.show("../test acc.png")
+    loss_animator.show("./test loss.png")
+    acc_animator.show("./test acc.png")

@@ -13,17 +13,25 @@
 import os
 import shutil
 import pickle
+import matplotlib
 import numpy as np
 import pandas as pd
 from copy import deepcopy
 from datetime import datetime
+from matplotlib import rcParams
 from matplotlib import pyplot as plt
 from matplotlib_inline import backend_inline  # 设置图片以SVG格式显示
 
 from .Cprint import cprint
 
+matplotlib.use("TkAgg")
+# 设置中文字体为 SimHei（黑体）
+rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+rcParams['axes.unicode_minus'] = False   # 用来正常显示负号
+
 
 class Writer:
+    VERSION = 1.0
     def __init__(self, save_dir, is_delete=False, *, fmts=None, figsize=None, **kwargs):
         """
         写入指标、参数、数据、日志；保存模型
@@ -34,7 +42,11 @@ class Writer:
         :param kwargs: 其他图窗相关参数。
         """
         if not os.path.isabs(save_dir):
-            raise ValueError(f"输入的根目录参数 {save_dir} 不是绝对路径！")
+            raise ValueError(f"输入的根目录 {save_dir} 不是绝对路径！")
+
+        # 设置保存目录
+        self.save_dir = save_dir  # 保存的根目录
+        self.is_delete = is_delete  # 是否删除原有的 save_result 文件夹
 
         # draw 绘图方法参数
         if fmts is None:
@@ -44,60 +56,48 @@ class Writer:
         self.fmts, self.figsize = fmts, figsize
         self.init_axes_set = kwargs
 
-        # 指标、参数、数据的索引
-        self.metric_key_index, self.parameter_key_index, self.data_key_index, self.log_key_index = 0, 0, 0, 0
-        self.metric = dict() # 指标（key 为关键词，value:pd.DataFrame 为所存储的指标）
-        self.parameters = dict()  # 参数（key 为关键词，value:str 为所存储的参数）
-        self.data = dict()  # 数据（key 为关键词，value:pd.DataFrame 为所存储的数据）
-        self.log = dict()  # 日志（key 为关键词，value:str 为所存储的日志）
+        # 暂存的内容和文件个数
+        self.num_df, self.num_param, self.num_text = 0, 0, 0
+        self.storage_df = dict()
+        self.storage_param = dict()
+        self.storage_text = dict()
 
-        self.save_dir = save_dir  # 保存的根目录
-        self.save_documents_path = os.path.join(save_dir, 'documents')  # 保存文档路径
-        self.save_models_path = os.path.join(save_dir, 'models_trained')  # 保存模型路径
-        self.save_results_path = os.path.join(save_dir, 'results')  # 保存结果路径
-        self.save_figures_path = os.path.join(save_dir, 'figures')  # 保存图片路径（Write）
-        self.sub_paths = [self.save_documents_path, self.save_models_path, self.save_results_path, self.save_figures_path]
-
-        # 删除文件夹
-        if os.path.exists(save_dir) and is_delete:
+        # 删除根目录和创建根目录
+        if os.path.exists(self.save_dir) and self.is_delete:
             self._delete_dir()
-        # 创建文件夹
-        for path in self.sub_paths:
-            if not os.path.exists(path):
-                os.makedirs(path)
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
+            with open(os.path.join(self.save_dir, ".result"), 'wb') as f:  # 创建识别文件
+                current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                IDENTIFY = f"VERSION: {self.VERSION}\nTIME: {current_time}\nPATH: {self.save_dir}"
+                f.write(IDENTIFY.encode('utf-8'))
 
     def _delete_dir(self):
-        """
-        删除 save_dir 文件夹。如果文件夹内存在文件的话，先验证是否存在 documents、models_trained、results、figures 文件夹。
-        如果不同时存在这些文件夹，则抛出 OSError 错误，因为您很有可能删除了错误的文件夹。
-        如果同时存在这些文件夹，那么将会删除这四个文件夹内的所有文件（包括这四个文件夹）。
-        最后，检查 self.save_dir 文件夹中是否有其他文件，如果有，则提示用户到资源管理器中核验，是否继续删除。
-        """
-        # Step 1: 验证是否存在 documents、models_trained、results、figures 文件夹
-        raise_info = f"您很有可能删除了错误的目录或该目录已经进行了修改。当前的根目录路径为：{self.save_dir}，请仔细检查！"
-        for path in self.sub_paths:
-            if not os.path.exists(path):
-                raise OSError(raise_info)
+        """以递归的形式删除 self.save_dir 文件夹"""
+        raise_info = (f"您当前删除的目录并非来自于 Writer 类自动生成或您对目录内的识别文件进行了修改。已触发保护机制，终止删除操作！\n"
+                      f"\t当前的根目录路径为：'{self.save_dir}'，请仔细检查！\n")
+        # Step 1: 删除保护机制。如果没有找到识别文件或者识别文件版本与当前版本不一致，则抛出 OSError 错误。
+        assert os.path.exists(os.path.join(self.save_dir, ".result")), raise_info
+        IDENTIFY_KEYS = {'VERSION', 'TIME', 'PATH'}
+        with open(os.path.join(self.save_dir, ".result"), 'rb') as f:  # 读取识别文件
+            IDENTIFY_read = f.read().decode('utf-8')
+        IDENTIFY_lines = IDENTIFY_read.split('\n')
+        for line in IDENTIFY_lines:
+            key, value = line.split(': ')
+            if key == 'VERSION':
+                assert float(value) == self.VERSION, raise_info
+                IDENTIFY_KEYS.remove(key)
+            elif key == 'PATH':
+                assert value == self.save_dir, raise_info
+                IDENTIFY_KEYS.remove(key)
+            elif key == 'TIME':
+                IDENTIFY_KEYS.remove(key)
+        assert not IDENTIFY_KEYS, raise_info
 
-        # Step 2: 删除这四个文件夹及其内部文件
-        for path in self.sub_paths:
-            while True:
-                verify = input(f"您确定要删除 '{path}' 文件夹及其内部文件吗？删除将无法恢复，请谨慎选择！(y/n)")
-                if verify.lower() == 'y':
-                    shutil.rmtree(path)
-                    print(f"删除 '{path}' 文件夹及其内部文件成功！")
-                    break
-                elif verify.lower() == 'n':
-                    print(f"取消删除 '{path}' 文件夹及其内部文件！")
-                    break
-                else:
-                    print("输入错误，请重新输入！")
-                    continue
-        # Step 3: 检查 self.save_dir 文件夹中是否有其他文件
+        # Step 2: 弹出资源管理器，并在输出中向用户确认是否删除。
         if os.listdir(self.save_dir):
             os.startfile(self.save_dir)
-            print(f"根目录 '{self.save_dir}' 中存在非 Writer 类产生的文件，已在资源管理器中打开该目录，请仔细核验！")
-            verify = input("请到资源管理器中仔细核验当前目录下的文件，删除将无法恢复，是否继续删除（摁下除 'y' 以外所有键取消删除）？")
+            verify = input("请在已打开的资源管理器中仔细核验需要删除的根目录路径，删除将无法恢复，是否继续删除（摁下除 'y' 以外所有键取消删除）？")
             if verify.lower() == 'y':
                 shutil.rmtree(self.save_dir)
                 print(f"根目录 '{self.save_dir}' 删除成功！")
@@ -107,166 +107,157 @@ class Writer:
             os.rmdir(self.save_dir)
             print(f"根目录 '{self.save_dir}' 删除成功！")
 
-    def check_key(self, new_key, ignore_dict):
+    def add_df(self, data_df, axis=0, filename=None, folder=None, suffix='csv', save_mode='none'):
         """
-        检查新的 key 是否已经存在于除 ignore_dict 之外的所有字典中。检查范围：self.metric, self.parameters, self.data, self.log。
-        如果存在相同的 key，则返回 True，否则返回 False。当返回结果为 True 时，请不要使用该 key。
-        """
-        all_dict = [self.metric, self.parameters, self.data, self.log]
-        check_result = any([new_key in d for d in all_dict if d is not ignore_dict])
-        return check_result
-
-    def add_metrics(self, metrics_df, axis, key=None):
-        """
-        添加指标到 self.metric 中。
-        :param metrics_df: pd.DataFrame 类型，需要添加的指标结果。
-        :param axis: 指定拼接的方向，0 为纵向拼接，1 为横向拼接。
-        :param key: 指定的 key，如果为 None，则自动生成一个 key。
-                    如果之前已经存在相同的 key，则将新的指标结果追加到原有的指标结果中；否则，新建一个 key。
-        :return: None
-        """
-        if key is None:
-            key = f"metric_{self.metric_key_index}"
-            self.metric_key_index += 1
-        if self.check_key(key, self.metric):
-            raise ValueError("指标名称不能与参数名称或者数据名称相同！")
-        elif key not in self.metric:
-            self.metric[key] = metrics_df
-        else:
-            self.metric[key] = pd.concat([self.metric[key], metrics_df], axis=axis)
-
-    def add_parameters(self, content_text, content_dict, key=None, sep='\n', end='\n\n'):
-        """
-        添加参数到 self.parameters 中。
-        :param content_text: 参数的文本内容。
-        :param content_dict: 参数的字典内容。
-        :param key: 指定的 key，如果为 None，则自动生成一个 key。
-                    如果之前已经存在相同的 key，则将新的参数追加到原有的参数中；否则，新建一个 key。
-        :param sep: 参数文本和参数字典、参数字典之间的分隔符。
-        :param end: 每次调用 add_parameters 时，在最后添加的分隔符。
-        :return: None
-        """
-        if key is None:
-            key = f"parameter_{self.parameter_key_index}"
-            self.parameter_key_index += 1
-        # 当前文本情况
-        if content_text and content_dict:
-            current_content = content_text + sep + \
-                              sep.join([f"\t{(key+':').ljust(30, ' ')} {value}" for key, value in content_dict.items()])
-        elif content_text and not content_dict:
-            current_content = content_text
-        elif not content_text and content_dict:
-            current_content = sep.join([f"\t{(key+':').ljust(30, ' ')} {value}" for key, value in content_dict.items()])
-        else:
-            raise ValueError("content_text 和 content_dict 不能同时为空！")
-        # 添加内容
-        if self.check_key(key, self.parameters):
-            raise ValueError("参数名称不能与指标名称或者数据名称相同！")
-        elif key not in self.parameters:
-            self.parameters[key] = current_content
-        else:
-            self.parameters[key] = self.parameters[key] + end + current_content
-
-    def add_data(self, data_df, axis, key=None):
-        """
-        添加数据到 self.data 中。
+        添加数据到 self.storage_df 中。
         :param data_df: pd.DataFrame 类型，需要添加的数据。
         :param axis: 指定拼接的方向，0 为纵向拼接，1 为横向拼接。
-        :param key: 指定的 key，如果为 None，则自动生成一个 key。
-                    如果之前已经存在相同的 key，则将新的数据追加到原有的数据中；否则，新建一个 key。
+        :param filename: 保存文件的文件名，无需添加后缀名。如果为 None，则用 "DataFrame_i" 代替。
+        :param folder: 保存文件所在的文件夹名称，如果为 None，则保存到根目录下。
+        :param suffix: 保存文件的文件后缀名，默认为 'csv'。可接受的后缀名有：'csv', 'xlsx', 'xls'。
+        :param save_mode: 保存模式。如果为 'none' 表示暂存不写入文件。如果为 'w+'，即覆盖写入。如果为 'a+'，则为追加写入。
+        Note: 如果确定之前没暂存过相同 os.path.join(folder, filename+'.'+suffix) 的数据，并且本地没有该文件，可以选择不传入 axis 参数；
+            否则强烈建议每次都手动传入 axis 参数。
         :return: None
         """
-        if key is None:
-            key = f"data_{self.data_key_index}"
-            self.data_key_index += 1
-        if self.check_key(key, self.data):
-            raise ValueError("数据名称不能与指标名称或者参数名称相同！")
-        elif key not in self.data:
-            self.data[key] = data_df
+        assert suffix in ['csv', 'xlsx', 'xls'], "不支持的文件后缀名！"
+        # 生成保存路径
+        if filename is None:
+            self.num_df += 1
+            filename = f"DataFrame_{self.num_df}"
+        if folder is None:
+            filepath = os.path.join(self.save_dir, filename + '.' + suffix)
         else:
-            self.data[key] = pd.concat([self.data[key], data_df], axis=axis)
-
-    def add_log(self, context, key=None, end='\n'):
-        """
-        添加日志到 self.log 中。
-        :param context: 日志内容。
-        :param key: 指定的 key，如果为 None，则自动生成一个 key。
-                    如果之前已经存在相同的 key，则将新的日志追加到原有的日志中；否则，新建一个 key。
-        :param end: 每次调用 add_log 时，在最后添加的分隔符。
-        :return: None
-        """
-        if key is None:
-            key = f"log_{self.log_key_index}"
-            self.log_key_index += 1
-        if self.check_key(key, self.log):
-            raise ValueError("数据名称不能与指标名称或者参数名称或者数据名称相同！")
-        elif key not in self.log:
-            self.log[key] = context
+            filepath = os.path.join(self.save_dir, folder, filename + '.' + suffix)
+        # 暂存数据
+        if filepath not in self.storage_df:
+            self.storage_df[filepath] = (axis, data_df)
         else:
-            self.log[key] = self.log[key] + end + context
+            self.storage_df[filepath] = (axis, pd.concat([self.storage_df[filepath][1], data_df], axis=axis))
+        # 写入数据
+        if save_mode in ['w+', 'a+']:
+            write_df(filepath, self.storage_df[filepath][1], axis=axis, save_mode=save_mode)
+            self.storage_df.pop(filepath)
 
-    def write_model(self, model, filename):
+    def add_text(self, context, end='\n', filename=None, folder=None, suffix='txt', save_mode='none'):
         """
-        保存模型。模型保存目录：self.save_models_path
-        :param model: 模型
-        :param filename: 文件名
+        添加日志到 self.storage_text 中。
+        :param context: 文本内容。
+        :param end: 每次调用本函数添加文本时，在文本之间添加的分隔符。
+        :param filename: 保存文件的文件名，无需添加后缀名。如果为 None，则用 "Text_i" 代替。
+        :param folder: 保存文件所在的文件夹名称，如果为 None，则保存到根目录下。
+        :param suffix: 保存文件的文件后缀名，默认为 'txt'。可接受任意后缀名，只需使用文本编辑器打开即可。
+        :param save_mode: 保存模式。如果为 'none' 表示暂存不写入文件。如果为 'w+'，即覆盖写入。如果为 'a+'，则为追加写入。
         :return: None
         """
-        with open(os.path.join(self.save_models_path, filename), 'wb') as f:
-            pickle.dump(model, f)
+        # 生成保存路径
+        if filename is None:
+            self.num_text += 1
+            filename = f"Text_{self.num_text}"
+        if folder is None:
+            filepath = os.path.join(self.save_dir, filename + '.' + suffix)
+        else:
+            filepath = os.path.join(self.save_dir, folder, filename + '.' + suffix)
+        # 暂存数据
+        if filepath not in self.storage_text:
+            self.storage_text[filepath] = context
+        else:
+            self.storage_text[filepath] = self.storage_text[filepath] + end + context
+        # 写入数据
+        if save_mode in ['w+', 'a+']:
+            write_text(filepath, self.storage_text[filepath], save_mode=save_mode)
+            self.storage_text.pop(filepath)
 
-    def write(self, save_mode='w+'):
+    def add_param(self, param_desc=None, param_dict=None, sep='\n', end='\n\n', filename=None, folder=None,
+                  suffix='param', save_mode='none'):
         """
-        将暂存的指标、参数、数据、日志导出到指定的文件夹中。
-        :param save_mode: 保存模式，默认为 'w+'，即覆盖写入。如果为 'a+'，则为追加写入（可实现不同 Writer 写入同一个文件）。
-        - 指标保存目录：self.save_results_path
-        - 数据保存目录：self.save_results_path
-        - 参数保存目录：self.save_documents_path
-        - 日志保存目录：self.save_documents_path
+        添加参数到 self.parameters 中。
+        :param param_desc: 需要保存的参数文本内容。
+        :param param_dict: 需要保存的参数字典内容。
+        :param sep: 参数文本和参数字典、参数字典之间的分隔符。
+        :param end: 每次调用本函数添加参数时，在不同参数之间添加的分隔符。
+        :param filename: 保存文件的文件名，无需添加后缀名。如果为 None，则用 "Parameter_i" 代替。
+        :param folder: 保存文件所在的文件夹名称，如果为 None，则保存到根目录下。
+        :param suffix: 保存文件的文件后缀名，默认为 'param'。可接受任意后缀名，只需使用文本编辑器打开即可。
+        :param save_mode: 保存模式。如果为 'none' 表示暂存不写入文件。如果为 'w+'，即覆盖写入。如果为 'a+'，则为追加写入。
+        :return: None
+        Note: add_param 函数虽然和 add_text 函数类似，但是 add_param 函数对字典形式的参数保存进行了格式化处理。
+        """
+        # 生成保存路径
+        if filename is None:
+            self.num_param += 1
+            filename = f"Parameter_{self.num_param}"
+        if folder is None:
+            filepath = os.path.join(self.save_dir, filename + '.' + suffix)
+        else:
+            filepath = os.path.join(self.save_dir, folder, filename + '.' + suffix)
+        # 当前文本情况
+        if param_desc and param_dict:
+            current_content = param_desc + sep + \
+                              sep.join([f"\t{(key+':').ljust(30, ' ')} {value}" for key, value in param_dict.items()])
+        elif param_desc and not param_dict:
+            current_content = param_desc
+        elif not param_desc and param_dict:
+            current_content = sep.join([f"\t{(key+':').ljust(30, ' ')} {value}" for key, value in param_dict.items()])
+        else:
+            raise ValueError("param_desc 和 param_dict 不能同时为空！")
+        # 暂存数据
+        if filepath not in self.storage_param:
+            self.storage_param[filepath] = current_content
+        else:
+            self.storage_param[filepath] = self.storage_param[filepath] + end + current_content
+        # 写入数据
+        if save_mode in ['w+', 'a+']:
+            write_text(filepath, self.storage_param[filepath], save_mode=save_mode)
+            self.storage_param.pop(filepath)
+
+    def write_file(self, data, filename, folder=None, suffix='pkl'):
+        """
+        使用 pickle 模块保存文件。
+        :param data: 需要保存的内容
+        :param filename: 保存文件的文件名，无需添加后缀名。
+        :param folder: 保存文件所在的文件夹名称，如果为 None，则保存到根目录下。
+        :param suffix: 保存文件的文件后缀名，默认为 'pkl'。可接受任意后缀名，只需使用 pickle.load 打开即可。
         :return: None
         """
-        assert save_mode in ['w+', 'a+'], "保存模式只能为 'w+' 或 'a+'！"
-        # 写入指标类文件
-        for key, value in self.metric.items():
-            if (save_mode == 'a+') and os.path.exists(os.path.join(self.save_results_path, f"{key}.xlsx")):
-                exist_excel = pd.read_excel(os.path.join(self.save_results_path, f"{key}.xlsx"), index_col=0)
-                new_csv = pd.concat([exist_excel, value], axis=0)
-                new_csv.to_excel(os.path.join(self.save_results_path, f"{key}.xlsx"), index=True)
-            else:
-                value.to_excel(os.path.join(self.save_results_path, f"{key}.xlsx"), index=True)
-        # 写入数据类文件
-        for key, value in self.data.items():
-            if (save_mode == 'a+') and os.path.exists(os.path.join(self.save_results_path, f"{key}.csv")):
-                exist_csv = pd.read_csv(os.path.join(self.save_results_path, f"{key}.csv"), index_col=0)
-                new_csv = pd.concat([exist_csv, value], axis=1)
-                new_csv.to_csv(os.path.join(self.save_results_path, f"{key}.csv"), index=True)
-            else:
-                value.to_csv(os.path.join(self.save_results_path, f"{key}.csv"), index=True)
-        # 写入参数类文件
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        for key, value in self.parameters.items():
-            with open(os.path.join(self.save_documents_path, f"{key}.txt"), save_mode, encoding='utf-8') as f:
-                if save_mode == 'w+':
-                    f.write(f"{current_time}\n{value}")
-                elif save_mode == 'a+':
-                    f.write(f"\n\n\n[{current_time}]\n{value}")
-        # 写入日志类文件
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        for key, value in self.log.items():
-            with open(os.path.join(self.save_documents_path, f"{key}.txt"), save_mode, encoding='utf-8') as f:
-                if save_mode == 'w+':
-                    f.write(f"{current_time}\n{value}")
-                elif save_mode == 'a+':
-                    f.write(f"\n\n\n[{current_time}]\n{value}")
+        # 生成保存路径
+        if folder is None:
+            filepath = os.path.join(self.save_dir, filename + '.' + suffix)
+        else:
+            if not os.path.exists(os.path.join(self.save_dir, folder)):
+                os.mkdir(os.path.join(self.save_dir, folder))
+            filepath = os.path.join(self.save_dir, folder, filename + '.' + suffix)
+        with open(filepath, 'wb') as f:
+            pickle.dump(data, f)
 
-    def draw(self, x, y=None, fmts=None, figsize=None, filename=None, show=True, **kwargs):
+    def write(self, save_mode=None):
+        """
+        将暂存的 DataFrame、文本和参数写到指定的文件夹中。
+        :param save_mode: 保存模式。如果为 'w+'，即覆盖写入。如果为 'a+'，则为追加写入（可实现不同 Writer 写入同一个文件）。
+                            默认为 None，如果 save_dir 目录在初始化时已经存在，并且 is_delete 为 False，则为 'a+'，否则为 'w+'。
+        :return: None
+        """
+        save_mode = 'a+' if save_mode is None else save_mode
+        # 写入 DataFrame 文件。
+        for path, (axis, value) in self.storage_df.items():
+            write_df(path, value, axis=axis, save_mode=save_mode)
+        # 写入文本文件 和 参数文件
+        assert not set(self.storage_text.keys()) & set(self.storage_param.keys()), "add_text 和 add_param 不能写入同一个文件！"
+        storage_string = deepcopy(self.storage_text)
+        storage_string.update(self.storage_param)
+        for path, value in storage_string.items():
+            write_text(path, value, save_mode=save_mode)
+
+    def draw(self, x, y=None, fmts=None, figsize=None, filename=None, folder=None, suffix='svg', show=True, **kwargs):
         """
         绘制图像
         :param x: 1D 类型的序列数据，例如：list、tuple、ndarray等（要求有 __len__ 魔法方法）；该参数也可以省略，自动匹配长度。
         :param y: 1D 或 2D 类型的序列数据，例如：list、tuple、ndarray等（要求有 __len__ 魔法方法）。
         :param fmts: 图像的格式，例如：['b-', 'm--', 'g-.', 'r:']。
         :param figsize: 图窗大小，例如：(7, 5)。
-        :param filename: 图片保存名称（带后缀）
+        :param filename: 图片保存名称，无需添加后缀名。如果为 None，则表示不保存图片。
+        :param folder: 保存图像所在的文件夹名称，如果为 None，则保存到根目录下。
+        :param suffix: 保存文件的文件后缀名，默认为 'svg'。可接受 matplotlib 支持保存的所有后缀名。
         :param show: 是否展示图像，默认为 True。
         :param kwargs: 其他图窗相关参数。
         :return: None
@@ -275,6 +266,15 @@ class Writer:
             """使用矢量图(SVG)打印图片"""
             backend_inline.set_matplotlib_formats('svg')
 
+        # 生成保存路径
+        if (filename is not None) and (folder is None):
+            filepath = os.path.join(self.save_dir, filename + '.' + suffix)
+        elif (filename is not None) and (folder is not None):
+            if not os.path.exists(os.path.join(self.save_dir, folder)):
+                os.mkdir(os.path.join(self.save_dir, folder))
+            filepath = os.path.join(self.save_dir, folder, filename + '.' + suffix)
+        else:
+            filepath = None  # 这意味着 filename 为 None，不保存图片。
         # 更新默认配置
         current_axes_set = deepcopy(self.init_axes_set)
         current_axes_set.update(kwargs)
@@ -308,13 +308,13 @@ class Writer:
         axes.grid()
         # 展示图像 和 保存图像
         if filename and show:
-            plt.savefig(os.path.join(self.save_figures_path, filename), dpi=None, facecolor='w', edgecolor='w')
+            plt.savefig(filepath, dpi=None, facecolor='w', edgecolor='w')
             plt.show()
-            cprint(f"绘制图像，图片已保存至 {os.path.join(self.save_figures_path, filename)}。", text_color="白色", end='\n')
+            cprint(f"绘制图像，图片已保存至 {filepath}。", text_color="白色", end='\n')
         elif filename and not show:
-            plt.savefig(os.path.join(self.save_figures_path, filename), dpi=None, facecolor='w', edgecolor='w')
+            plt.savefig(filepath, dpi=None, facecolor='w', edgecolor='w')
             plt.close()
-            cprint(f"未绘制图像，图片已保存至 {os.path.join(self.save_figures_path, filename)}", text_color="红色", end='\n')
+            cprint(f"未绘制图像，图片已保存至 {filepath}", text_color="红色", end='\n')
         elif not filename and show:
             plt.show()
             cprint("图像绘制完成，但未保存图像！", text_color="红色", end='\n')
@@ -323,3 +323,39 @@ class Writer:
             cprint("未绘制图像，也未保存图像！", text_color="红色", end='\n')
         else:
             raise ValueError("出现未预知的错误！")
+
+
+def write_df(path, value, axis=0, save_mode='a+'):
+    assert save_mode in ['w+', 'a+'], "保存模式只能为 'w+' 或 'a+'！"
+    if not os.path.exists(os.path.dirname(path)):  # 如果文件夹不存在，则创建文件夹
+        os.mkdir(os.path.dirname(path))
+    if (save_mode == 'a+') and os.path.exists(path):  # 追加写入
+        if path.endswith('.csv'):  # csv 格式数据
+            exist_file = pd.read_csv(path, index_col=0)
+        elif path.endswith('.xlsx') or path.endswith('.xls'):  # excel 格式数据
+            exist_file = pd.read_excel(path, index_col=0)
+        else:
+            raise ValueError(f"不支持的文件格式：{os.path.basename(path)}")
+        new_file = pd.concat([exist_file, value], axis=axis)
+        new_file.to_csv(path, index=True) if path.endswith('.csv') else new_file.to_excel(path, index=True)
+    else:  # 覆盖写入
+        if path.endswith('.csv'):
+            value.to_csv(path, index=True)
+        elif path.endswith('.xlsx') or path.endswith('.xls'):
+            value.to_excel(path, index=True)
+        else:
+            raise ValueError(f"不支持的文件格式：{os.path.basename(path)}")
+
+
+def write_text(path, value, save_mode='a+'):
+    assert save_mode in ['w+', 'a+'], "保存模式只能为 'w+' 或 'a+'！"
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 当前时间
+    current_time = '-' * 100 + '\n' + current_time + '\n' + '-' * 100 + '\n'
+    if not os.path.exists(os.path.dirname(path)):  # 如果文件夹不存在，则创建文件夹
+        os.mkdir(os.path.dirname(path))
+    if (save_mode == 'a+') and os.path.exists(path):  # 追加写入
+        with open(path, 'a+', encoding='utf-8') as f:
+            f.write('\n\n' + current_time + value)
+    else:  # 覆盖写入
+        with open(path, 'w+', encoding='utf-8') as f:
+            f.write(current_time + value)

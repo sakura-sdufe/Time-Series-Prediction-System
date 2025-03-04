@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 
 from utils.device_gpu import try_gpu
-from .Base import ModelBase
+from Base.Base import ModelBase
 
 
 class RNNModelBase(ModelBase):
@@ -39,7 +39,7 @@ class RNNModelBase(ModelBase):
     def forward(self, inputs, hidden_state):
         """
         RNNs 系列模型向前计算
-        :param inputs: 输入张量。维度为：[time_step, batch_size, input_size]。
+        :param inputs: 输入张量。维度为：[num_predictors, batch_size, input_size]。
         :param hidden_state: 隐藏层初始状态。
             如果为 RNN 和 GRU，那么维度为：[direction_size*num_layers, batch_size, hidden_size]。
             如果为 LSTM，那么为 Tuple：(h0, c0)，其中 h0 的维度为：[direction_size*num_layers, batch_size, proj_size]；
@@ -110,7 +110,7 @@ class RNNModelBase(ModelBase):
                     s.detach_()
 
             X, Y = X.to(device), Y.to(device)  # 将数据转移到设备上
-            X = X.permute(1, 0, 2)  # 将输入张量的维度调整为：[time_step, batch_size, input_size]
+            X = X.permute(1, 0, 2)  # 将输入张量的维度调整为：[num_predictors, batch_size, input_size]
             Y = Y.unsqueeze(dim=1)  # 将目标张量的维度调整为：[batch_size, output_size]
             Y_hat, hidden_state = self(X, state)
             loss_value = criterion(Y_hat, Y.float())
@@ -156,7 +156,7 @@ class RNNModelBase(ModelBase):
                         s.detach_()
                 # RNNs 开始推理
                 X, Y = X.to(device), Y.to(device)
-                X = X.permute(1, 0, 2)  # 将输入张量的维度调整为：[time_step, batch_size, input_size]
+                X = X.permute(1, 0, 2)  # 将输入张量的维度调整为：[num_predictors, batch_size, input_size]
                 Y_hat, hidden_state = self(X, state)
                 predict_list.append(Y_hat.cpu())
         predict_result = torch.cat(predict_list, dim=0)

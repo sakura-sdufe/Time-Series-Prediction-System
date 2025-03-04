@@ -60,7 +60,7 @@ def calculate_metrics(true_value, predict_value, metrics=None):
     :return: 以字典的形式返回评价指标值。
     """
     if metrics is None:
-        metrics = ["sMAPE", "RMSE", "MAE", "R2"]
+        metrics = ["sMAPE", "MAPE", "RMSE", "MSE", "MAE", "R2"]
     true_value = _convert_to_numpy(true_value)
     predict_value = _convert_to_numpy(predict_value)
 
