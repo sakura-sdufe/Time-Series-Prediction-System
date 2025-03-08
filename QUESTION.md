@@ -13,6 +13,3 @@
 ## 数据部分
 - [ ] 修改 **data/data_scale/norm.py** 文件中的 Norm 类，使其可以指定均值和方差。
 - [ ] 实现 **data/data_scale/min_max.py** 文件中的 MinMax 类。
-
-## 集成部分（暂定为 combination 模块）
-- [ ] 需要实现集成模块。

@@ -40,7 +40,7 @@ class Attention(nn.Module):
         :param v: 值张量，维度为 [batch_size, dim_k]。
         :return: 输出张量，维度为 [batch_size, dim_q]。
         """
-        q, k, v = self.q_conv(q.unsqueeze(1)), self.k_conv(k.unsqueeze(1)), self.v_conv(v.unsqueeze(1))  # shape: [batch_size, embed_dim, dim_q]
+        q, k, v = self.q_conv(q.unsqueeze(1)), self.k_conv(k.unsqueeze(1)), self.v_conv(v.unsqueeze(1))  # shape: [batch_size, 1, dim_q]
         q, k, v = q.permute(2, 0, 1), k.permute(2, 0, 1), v.permute(2, 0, 1)  # shape: [dim_q, batch_size, embed_dim]
         self.attn_output, self.attn_weight = self.attn(q, k, v)  # shape: [dim_q, batch_size, embed_dim]
         self.attn_output = self.output_conv(self.attn_output.permute(1, 2, 0)).squeeze(1)  # shape: [batch_size, dim_q]

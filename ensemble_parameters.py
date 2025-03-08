@@ -32,6 +32,11 @@ class EnsembleParameters:
             'bias': True,
             'activation': 'relu',
         }
+        # C2L 模型参数
+        self.C2L = {
+            'output_size': 1,
+            'activation': 'relu',
+        }
         # C3B2H 模型参数
         self.C3B2H = {
             'output_size': 1,

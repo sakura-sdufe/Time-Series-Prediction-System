@@ -14,6 +14,16 @@ from torch import nn
 from Base import EnsembleBase, get_activation_fn, get_activation_nn
 
 
+class CA(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, activation='relu'):
+        super(CA, self).__init__()
+        self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding, bias=bias)
+        self.activation = get_activation_fn(activation)
+
+    def forward(self, x):
+        return self.activation((self.conv(x)))
+
+
 class CBA(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, activation='relu'):
         super(CBA, self).__init__()
@@ -37,6 +47,22 @@ class Bottleneck(nn.Module):
 
     def forward(self, x):
         return self.conv2(self.conv1(x)) + x if self.add else self.conv2(self.conv1(x))
+
+
+class C2L(EnsembleBase):
+    def __init__(self, activation='relu'):
+        super(C2L, self).__init__()
+        self.conv1 = CA(1, 2, 3, padding=1, stride=2, activation=activation)
+        self.conv2 = CA(2, 4, 3, padding=1, stride=2, activation=activation)
+        self.linear = nn.Linear(4, 1)
+
+    def forward(self, x):
+        """
+        1. 输入应当是一个 Tensor，且维度应为：[batch_size, 4]；
+        2. 输出应当是一个 Tensor，且维度应为：[batch_size, 1]。
+        """
+        x = self.conv2(self.conv1(x.unsqueeze(1)))  # shape: [batch_size, 4, 1]
+        return self.linear(x.squeeze(2))  # shape: [batch_size, 1]
 
 
 class C3B2H(EnsembleBase):
