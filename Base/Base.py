@@ -106,6 +106,7 @@ def train_DL(model, train_trainer, train_evaler, valid_evaler, *, epochs, criter
             try:
                 model.load_state_dict(torch.load(os.path.join(best_model_dir, best_model_filename)).state_dict())
                 print("\n" + "-"*100 + "\n学习率发生变化，读取之前的最优模型，在最优模型上继续训练。\n" + "-"*100 + "\n")
+                current_lr = optimizer.param_groups[0]['lr']
             except Exception:
                 warnings.warn(f"读取最优模型失败，将使用学习率更新前的上一个状态继续训练。")
         print(f"epoch：{epoch+1}，学习率：{optimizer.param_groups[0]['lr']}，每秒样本数：{sample_sec:.2f}；\n",
@@ -118,8 +119,11 @@ def train_DL(model, train_trainer, train_evaler, valid_evaler, *, epochs, criter
         if valid_monitor < best_monitor:  # 保存最佳模型
             best_monitor = valid_monitor
             if best_model_dir:
+                delete_model_filename = best_model_filename  # 字符串无需深拷贝
                 best_model_filename = f'epoch={epoch+1}, monitor={valid_monitor:.5f}.pth'
                 torch.save(model, os.path.join(best_model_dir, best_model_filename))
+                if delete_model_filename:
+                    os.remove(os.path.join(best_model_dir, delete_model_filename))
         loss_animators.add(epoch+1, [train_loss, valid_loss])  # 绘制损失函数动态图
         monitor_animators.add(epoch+1, [train_monitor, valid_monitor])  # 绘制监控器指标动态图
     loss_animators.show(loss_figure_path)  # 显示（保存）损失函数动态图

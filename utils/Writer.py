@@ -241,12 +241,15 @@ class Writer:
         # 写入 DataFrame 文件。
         for path, (axis, value) in self.storage_df.items():
             write_df(path, value, axis=axis, save_mode=save_mode)
+        self.storage_df.clear()  # 删除已写入的数据
         # 写入文本文件 和 参数文件
         assert not set(self.storage_text.keys()) & set(self.storage_param.keys()), "add_text 和 add_param 不能写入同一个文件！"
         storage_string = deepcopy(self.storage_text)
         storage_string.update(self.storage_param)
         for path, value in storage_string.items():
             write_text(path, value, save_mode=save_mode)
+        self.storage_text.clear()  # 删除已写入的数据
+        self.storage_param.clear()  # 删除已写入的数据
 
     def draw(self, x, y=None, fmts=None, figsize=None, filename=None, folder=None, suffix='svg', show=True, **kwargs):
         """

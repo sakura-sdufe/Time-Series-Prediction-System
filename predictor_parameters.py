@@ -147,8 +147,8 @@ class PredictorParameters:
             'learning_rate': 1e-3,  # 学习率，默认为 1e-3。
             'weight_decay': 1e-4,  # 权重衰减，默认为 1e-4。
             'clip_norm': 0.5,  # 梯度裁剪阈值，默认为 None，表示不裁剪。
-            'ReduceLROnPlateau_factor': 0.5,  # 学习率衰减因子，默认为 0.5。
-            'ReduceLROnPlateau_patience': 15,  # 监测器函数不再减小的累计次数，默认为 10。
+            'ReduceLROnPlateau_factor': 0.3,  # 学习率衰减因子，默认为 0.5。
+            'ReduceLROnPlateau_patience': 30,  # 监测器函数不再减小的累计次数，默认为 10。
             'ReduceLROnPlateau_threshold': 1e-4,  # 只关注超过阈值的显著变化，默认为 1e-4。
         }
 
