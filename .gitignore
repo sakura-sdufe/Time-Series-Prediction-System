@@ -160,9 +160,13 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
-
+preprocessing/
+predictor/
 Datasets/
 result/
+predictor_main.py
+ensemble_main.py
 Debug.py
 test.py
-
+temp.py
+QUESTION.md

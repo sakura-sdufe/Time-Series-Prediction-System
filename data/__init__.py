@@ -10,6 +10,8 @@
 -------------------------------------------------
 """
 
+from .read_data import read_file
+
 from .data_selection import select_best_feature
 
 from .data_scale.norm import Norm
@@ -23,5 +25,5 @@ from .data_encapsulation.ensemble_DL import EnsembleDataset, EnsembleLoader
 
 
 
-__all__ = ['select_best_feature', 'Norm', 'MinMax', 'SeqSplit', 'SeqDataset', 'SeqLoader',
+__all__ = ['read_file', 'select_best_feature', 'Norm', 'MinMax', 'SeqSplit', 'SeqDataset', 'SeqLoader',
            'EnsembleSplit', 'EnsembleDataset', 'EnsembleLoader']

@@ -84,7 +84,7 @@ class AttentionEnsemble(EnsembleBase):
         return output
 
 
-class AttentionProEnsemble(EnsembleBase):
+class AttentionProjEnsemble(EnsembleBase):
     def __init__(self, input_size, output_size, project_size, *, feedforward=2048, dropout=0.1, bias=True,
                  activation='relu', **kwargs):
         """
@@ -98,7 +98,7 @@ class AttentionProEnsemble(EnsembleBase):
         :param activation: 激活函数。默认值为 'relu'，可选值 'relu', 'gelu'。
         :param kwargs: nn.MultiheadAttention() 的其他参数。
         """
-        super(AttentionProEnsemble, self).__init__()
+        super(AttentionProjEnsemble, self).__init__()
         self.attn_weight = None  # 保存注意力权重
         self.activation = get_activation_fn(activation)  # 激活函数
 
