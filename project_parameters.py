@@ -29,15 +29,15 @@ class ProjectParameters:
         # 保存预测器结果的目录
         self.save_predictor_dir = os.path.join(
             r'./result',
-            # f"{self.dataset_name} [Predictor] (time={formatted_time})"
-            f"{self.dataset_name} [Predictor] (time=2025-03-23)"
+            f"{self.dataset_name} [Predictor] (time={formatted_time})"
+            # f"{self.dataset_name} [Predictor] (time=2025-03-23)"
         )
         # 读取预测器结果和保存集成器结果的目录
         self.read_predictor_dir = self.save_predictor_dir
         self.save_ensemble_dir = os.path.join(
             r'./result',
-            # f"{self.dataset_name} [Ensemble] (time={formatted_time})"
-            f"{self.dataset_name} [Ensemble] (time=2025-03-23)"
+            f"{self.dataset_name} [Ensemble] (time={formatted_time})"
+            # f"{self.dataset_name} [Ensemble] (time=2025-03-23)"
         )
 
     def __getitem__(self, item):
